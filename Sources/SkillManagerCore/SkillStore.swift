@@ -1,0 +1,167 @@
+import Foundation
+
+public struct Toast: Identifiable, Equatable, Sendable {
+    public enum Style: Sendable { case info, success, error }
+
+    public let id = UUID()
+    public let message: String
+    public let style: Style
+
+    public init(_ message: String, style: Style = .success) {
+        self.message = message
+        self.style = style
+    }
+}
+
+/// App-wide observable state: scan results, directory watching, and the
+/// write-side operations the UI calls into.
+@MainActor
+public final class SkillStore: ObservableObject {
+    @Published public private(set) var skills: [Skill] = []
+    @Published public private(set) var isLoading = false
+    @Published public var toast: Toast?
+
+    private var watchers: [DirectoryWatcher] = []
+    private var toastDismissTask: Task<Void, Never>?
+
+    public init() {}
+
+    public func count(for tool: Tool) -> Int {
+        skills.filter { $0.copy(for: tool) != nil }.count
+    }
+
+    // MARK: - Scanning
+
+    public func refresh() async {
+        isLoading = true
+        defer { isLoading = false }
+        let copies = await Task.detached(priority: .userInitiated) {
+            Tool.allCases.flatMap { SkillScanner.scan(tool: $0) }
+        }.value
+        skills = Skill.merge(copies)
+    }
+
+    public func startWatching() {
+        watchers = Tool.allCases.compactMap { tool in
+            DirectoryWatcher(url: tool.skillsDirectory) {
+                Task { @MainActor [weak self] in
+                    await self?.refresh()
+                    // The watched descriptor dies if the directory itself is
+                    // replaced; re-arm to keep updates flowing.
+                    self?.startWatching()
+                }
+            }
+        }
+    }
+
+    // MARK: - Mutations
+
+    public func trash(_ copy: SkillCopy) async {
+        do {
+            try FileManager.default.trashItem(at: copy.directoryURL, resultingItemURL: nil)
+            showToast(Toast("已将「\(copy.folderName)」从 \(copy.tool.displayName) 移入废纸篓"))
+        } catch {
+            showToast(Toast("删除失败：\(error.localizedDescription)", style: .error))
+        }
+        await refresh()
+    }
+
+    public struct InstallRequest: Identifiable, Hashable, Sendable {
+        public let candidate: InstallCandidate
+        public let tool: Tool
+
+        public init(candidate: InstallCandidate, tool: Tool) {
+            self.candidate = candidate
+            self.tool = tool
+        }
+
+        public var id: String { "\(candidate.id)→\(tool.rawValue)" }
+    }
+
+    /// Installs each candidate into its target tool. Returns the requests that
+    /// hit a same-name conflict (when `overwrite` is false) so the UI can ask
+    /// for overwrite confirmation and retry just those.
+    public func install(_ requests: [InstallRequest], overwrite: Bool) async -> [InstallRequest] {
+        var conflicts: [InstallRequest] = []
+        var installed = 0
+        for request in requests {
+            do {
+                try SkillInstaller.install(candidate: request.candidate, to: request.tool, overwrite: overwrite)
+                installed += 1
+            } catch let error as InstallError {
+                if case .alreadyExists = error, !overwrite {
+                    conflicts.append(request)
+                } else {
+                    showToast(Toast(error.localizedDescription, style: .error))
+                }
+            } catch {
+                showToast(Toast("安装失败：\(error.localizedDescription)", style: .error))
+            }
+        }
+        if installed > 0 {
+            showToast(Toast("已安装 \(installed) 个 skill"))
+        }
+        await refresh()
+        return conflicts
+    }
+
+    /// Creates a blank skill from the template. Returns the created folder name on success.
+    public func createTemplate(name: String, description: String, tools: [Tool]) async -> Bool {
+        var succeeded = false
+        for tool in tools {
+            do {
+                try SkillInstaller.createTemplate(name: name, description: description, tool: tool)
+                succeeded = true
+            } catch {
+                showToast(Toast(error.localizedDescription, style: .error))
+            }
+        }
+        if succeeded {
+            showToast(Toast("已创建「\(name)」"))
+        }
+        await refresh()
+        return succeeded
+    }
+
+    public func copySkill(_ copy: SkillCopy, to tool: Tool, overwrite: Bool) async -> Bool {
+        do {
+            try SkillInstaller.copySkill(copy, to: tool, overwrite: overwrite)
+            showToast(Toast("已将「\(copy.folderName)」复制到 \(tool.displayName)"))
+            await refresh()
+            return true
+        } catch let error as InstallError {
+            if case .alreadyExists = error, !overwrite {
+                return false // caller shows the overwrite confirmation
+            }
+            showToast(Toast(error.localizedDescription, style: .error))
+        } catch {
+            showToast(Toast("复制失败：\(error.localizedDescription)", style: .error))
+        }
+        await refresh()
+        return true
+    }
+
+    public func saveSkillFile(_ copy: SkillCopy, contents: String) async -> Bool {
+        do {
+            try contents.write(to: copy.skillFileURL, atomically: true, encoding: .utf8)
+            showToast(Toast("已保存 \(copy.folderName)/SKILL.md"))
+            await refresh()
+            return true
+        } catch {
+            showToast(Toast("保存失败：\(error.localizedDescription)", style: .error))
+            return false
+        }
+    }
+
+    // MARK: - Toast
+
+    public func showToast(_ toast: Toast) {
+        self.toast = toast
+        toastDismissTask?.cancel()
+        toastDismissTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2.6))
+            guard !Task.isCancelled else { return }
+            self?.toast = nil
+        }
+    }
+}
