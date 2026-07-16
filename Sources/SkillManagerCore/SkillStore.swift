@@ -222,6 +222,50 @@ public final class SkillStore: ObservableObject {
         }
     }
 
+    // MARK: - Origin updates
+
+    public enum UpdateCheckResult: Equatable, Sendable {
+        case upToDate
+        case available(String)
+        case failed(String)
+    }
+
+    /// Compares the installed revision against upstream HEAD (or the pinned ref).
+    public func checkForUpdate(_ copy: SkillCopy) async -> UpdateCheckResult {
+        guard let origin = copy.origin,
+              let target = SkillInstaller.parseGitHubURL(origin.sourceURL) else {
+            return .failed(L("无法识别的 GitHub 链接。支持仓库或仓库子目录链接，例如 https://github.com/org/repo 或 …/tree/main/skills/foo。"))
+        }
+        do {
+            let latest = try await SkillInstaller.latestCommit(for: target)
+            return origin.isCurrent(latest: latest) ? .upToDate : .available(String(latest.prefix(7)))
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    /// Re-downloads the skill from its recorded source and overwrites the
+    /// local copy (old version goes to the Trash via the install pipeline).
+    public func updateFromOrigin(_ copy: SkillCopy) async -> Bool {
+        guard let origin = copy.origin else { return false }
+        do {
+            let candidates = try await SkillInstaller.downloadFromGitHub(origin.sourceURL)
+            let wanted = copy.directoryURL.lastPathComponent
+            guard let candidate = candidates.first(where: { $0.name == wanted })
+                ?? (candidates.count == 1 ? candidates[0] : nil) else {
+                showToast(Toast(L("未在上游找到「\(wanted)」"), style: .error))
+                return false
+            }
+            try SkillInstaller.install(candidate: candidate, to: copy.tool, overwrite: true)
+            showToast(Toast(L("已更新「\(wanted)」")))
+            await refresh()
+            return true
+        } catch {
+            showToast(Toast(L("更新失败：\(error.localizedDescription)"), style: .error))
+            return false
+        }
+    }
+
     // MARK: - Toast
 
     public func showToast(_ toast: Toast) {

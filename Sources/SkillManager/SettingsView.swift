@@ -6,6 +6,7 @@ struct SettingsView: View {
 
     @State private var showCustomToolSheet = false
     @State private var showProjectImporter = false
+    @State private var githubToken = GitHubAuth.token() ?? ""
 
     var body: some View {
         Form {
@@ -36,6 +37,32 @@ struct SettingsView: View {
                 Text(L("登记项目后，管理其中的 .claude/skills 目录；也可以直接把项目文件夹拖进主窗口。"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            Section(L("GitHub")) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        SecureField(
+                            L("GitHub Token（可选）"),
+                            text: $githubToken,
+                            prompt: Text(verbatim: "ghp_… / github_pat_…")
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        Button(L("保存")) {
+                            if GitHubAuth.setToken(githubToken) {
+                                store.showToast(Toast(L("已保存到钥匙串"), style: .info))
+                            }
+                        }
+                        .disabled(githubToken.trimmingCharacters(in: .whitespaces).isEmpty)
+                        Button(L("清除")) {
+                            GitHubAuth.setToken(nil)
+                            githubToken = ""
+                            store.showToast(Toast(L("已从钥匙串移除"), style: .info))
+                        }
+                    }
+                    Text(L("用于访问私有仓库与提高 API 限额，保存在系统钥匙串。"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             Section {
                 Button(L("立即重新扫描")) {

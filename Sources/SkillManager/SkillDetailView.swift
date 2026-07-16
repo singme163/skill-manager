@@ -14,6 +14,9 @@ struct SkillDetailView: View {
     @State private var loadedText = ""
     @State private var showForceSaveAlert = false
     @State private var overwriteCopyTarget: Tool?
+    @State private var updateStatus: SkillStore.UpdateCheckResult?
+    @State private var isCheckingUpdate = false
+    @State private var isUpdating = false
 
     enum DetailMode: String, CaseIterable, Identifiable {
         case preview
@@ -58,6 +61,9 @@ struct SkillDetailView: View {
             if !availableModes.contains(mode) {
                 mode = .preview
             }
+            updateStatus = nil
+            isCheckingUpdate = false
+            isUpdating = false
         }
         .alert(L("Frontmatter 校验未通过"), isPresented: $showForceSaveAlert) {
             Button(L("仍要保存"), role: .destructive) {
@@ -336,6 +342,12 @@ struct SkillDetailView: View {
                     )
                 }
 
+                if let origin = currentCopy.origin {
+                    usageSection(title: L("来源与更新"), icon: "arrow.triangle.2.circlepath") {
+                        originSection(origin)
+                    }
+                }
+
                 usageSection(title: L("安装位置"), icon: "internaldrive") {
                     ForEach(skill.copies) { copy in
                         HStack(spacing: 8) {
@@ -351,6 +363,98 @@ struct SkillDetailView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
+        }
+    }
+
+    @ViewBuilder
+    private func originSection(_ origin: SkillOrigin) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "link")
+                    .foregroundStyle(.secondary)
+                if let url = URL(string: origin.sourceURL) {
+                    Link(origin.sourceURL, destination: url)
+                        .font(.callout)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                } else {
+                    Text(origin.sourceURL)
+                        .font(.callout)
+                        .lineLimit(1)
+                }
+            }
+            HStack(spacing: 12) {
+                Text(L("安装于 \(origin.installedAt.formatted(date: .abbreviated, time: .shortened))"))
+                if let commit = origin.commit {
+                    Text(L("版本 \(String(commit.prefix(7)))"))
+                        .font(.caption.monospaced())
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                Button {
+                    checkUpdate()
+                } label: {
+                    if isCheckingUpdate {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text(L("检查更新"))
+                    }
+                }
+                .disabled(isCheckingUpdate || isUpdating)
+
+                switch updateStatus {
+                case .none:
+                    EmptyView()
+                case .upToDate:
+                    Label(L("已是最新"), systemImage: "checkmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                case .available(let sha):
+                    Label(L("有可用更新（\(sha)）"), systemImage: "arrow.down.circle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Button(L("更新")) {
+                        applyUpdate()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(isUpdating)
+                case .failed(let message):
+                    Label(L("检查失败：\(message)"), systemImage: "xmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                }
+            }
+            if case .available = updateStatus {
+                Text(L("更新会覆盖本地修改（旧版本移入废纸篓）"))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func checkUpdate() {
+        isCheckingUpdate = true
+        let copy = currentCopy
+        Task {
+            let result = await store.checkForUpdate(copy)
+            updateStatus = result
+            isCheckingUpdate = false
+        }
+    }
+
+    private func applyUpdate() {
+        isUpdating = true
+        let copy = currentCopy
+        Task {
+            if await store.updateFromOrigin(copy) {
+                updateStatus = SkillStore.UpdateCheckResult.upToDate
+            }
+            isUpdating = false
         }
     }
 

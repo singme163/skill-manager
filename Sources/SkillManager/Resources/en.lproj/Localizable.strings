@@ -137,3 +137,38 @@
 "添加项目…" = "Add Project…";
 "登记项目后，管理其中的 .claude/skills 目录；也可以直接把项目文件夹拖进主窗口。" = "Registering a project manages its .claude/skills directory. You can also drop a project folder onto the main window.";
 "在该项目内的 Claude Code 会话中作为斜杠命令调用" = "Invoke as a slash command in Claude Code sessions inside this project";
+
+/* Discovery & updates (v1.4) */
+"发现 Skill…" = "Discover Skills…";
+"发现 Skill" = "Discover Skills";
+"精选 skill 索引，社区可通过仓库 PR 收录。" = "A curated skill index — contribute entries via repository PRs.";
+"正在加载索引…" = "Loading index…";
+"索引加载失败，已显示内置副本。" = "Remote index unavailable; showing the bundled copy.";
+"搜索名称、描述或标签" = "Search names, descriptions, or tags";
+"没有匹配的条目" = "No matching entries";
+"在浏览器打开" = "Open in Browser";
+"关闭" = "Close";
+"来源与更新" = "Source & Updates";
+"安装于 %@" = "Installed %@";
+"版本 %@" = "Revision %@";
+"检查更新" = "Check for Updates";
+"已是最新" = "Up to date";
+"有可用更新（%@）" = "Update available (%@)";
+"更新" = "Update";
+"更新会覆盖本地修改（旧版本移入废纸篓）" = "Updating overwrites local changes (the old version moves to the Trash)";
+"检查失败：%@" = "Check failed: %@";
+"GitHub Token（可选）" = "GitHub Token (Optional)";
+"用于访问私有仓库与提高 API 限额，保存在系统钥匙串。" = "Used for private repositories and higher API rate limits; stored in the system Keychain.";
+"清除" = "Clear";
+"已保存到钥匙串" = "Saved to Keychain";
+"已从钥匙串移除" = "Removed from Keychain";
+
+/* Batch operations (v1.4) */
+"已选择 %lld 个 skill" = "%lld skills selected";
+"右键进行批量删除、复制或导出" = "Right-click for batch delete, copy, or export";
+"删除 %lld 个 skill？" = "Delete %lld skills?";
+"删除（移入废纸篓）" = "Delete (move to Trash)";
+"导出 zip…" = "Export as zip…";
+"已导出 %lld 个 zip" = "Exported %lld zip archive(s)";
+"导出失败：%@" = "Export failed: %@";
+"已复制 %lld 个，跳过 %lld 个（已存在或冲突）" = "Copied %1$lld, skipped %2$lld (already present or conflicting)";

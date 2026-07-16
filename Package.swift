@@ -13,6 +13,7 @@ let package = Package(
     targets: [
         .target(
             name: "SkillManagerCore",
+            resources: [.copy("Resources/skills-index.json")],
             swiftSettings: settings
         ),
         .executableTarget(

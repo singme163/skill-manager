@@ -5,7 +5,6 @@
 "下载失败：%@" = "Download failed: %@";
 "解压失败：%@" = "Unzip failed: %@";
 "「%@」不是合法的 skill 名称（只允许小写字母、数字和连字符）。" = "“%@” is not a valid skill name (only lowercase letters, digits, and hyphens are allowed).";
-"HTTP %lld（仅支持公开仓库，请检查链接与网络）" = "HTTP %lld (only public repositories are supported — check the link and your network)";
 
 /* Toasts */
 "已将「%@」从 %@ 移入废纸篓" = "Moved “%1$@” from %2$@ to the Trash";
@@ -26,3 +25,9 @@
 /* Projects (v1.3) */
 "该项目已登记" = "This project is already registered";
 "已登记项目「%@」" = "Registered project “%@”";
+
+/* Origin updates (v1.4) */
+"已更新「%@」" = "Updated “%@”";
+"更新失败：%@" = "Update failed: %@";
+"未在上游找到「%@」" = "Couldn't find “%@” upstream";
+"HTTP %lld（私有仓库需在设置中配置 GitHub Token，请检查链接与网络）" = "HTTP %lld (for private repositories set a GitHub token in Settings — check the link and your network)";

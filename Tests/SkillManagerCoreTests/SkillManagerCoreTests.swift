@@ -163,6 +163,91 @@ import Foundation
     }
 }
 
+// MARK: - Origin & discovery (v1.4)
+
+@Suite final class SkillOriginTests {
+    let tempDir: URL
+
+    init() throws {
+        tempDir = try SkillInstaller.makeTempDirectory()
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: tempDir)
+    }
+
+    @Test func originRoundTripsAndIsPickedUpByScanner() throws {
+        try makeSkill("tracked", in: tempDir)
+        let skillDir = tempDir.appending(path: "tracked")
+        let origin = SkillOrigin(
+            sourceURL: "https://github.com/org/repo",
+            ref: "main",
+            commit: "abc1234"
+        )
+        try origin.write(to: skillDir)
+
+        let read = SkillOrigin.read(from: skillDir)
+        #expect(read?.sourceURL == "https://github.com/org/repo")
+        #expect(read?.commit == "abc1234")
+
+        let copies = SkillScanner.scan(directory: tempDir, tool: .claudeCode)
+        #expect(copies.first?.origin?.commit == "abc1234")
+        // The sidecar is hidden and must not pollute the file listing.
+        #expect(!SkillScanner.fileListing(of: skillDir).contains { $0.contains(".skillmanager") })
+    }
+
+    @Test func isCurrentComparesByShaPrefix() {
+        let origin = SkillOrigin(sourceURL: "u", commit: "abc1234")
+        #expect(origin.isCurrent(latest: "abc1234def5678900000"))
+        #expect(!origin.isCurrent(latest: "fff9999"))
+        #expect(!SkillOrigin(sourceURL: "u", commit: nil).isCurrent(latest: "abc"))
+    }
+
+    @Test func shaSuffixParsing() {
+        #expect(SkillInstaller.shaSuffix(of: "anthropics-skills-abc1234") == "abc1234")
+        #expect(SkillInstaller.shaSuffix(of: "org-multi-part-repo-deadbeef99") == "deadbeef99")
+        #expect(SkillInstaller.shaSuffix(of: "no-sha-here") == nil)
+    }
+
+    @Test func installWritesOriginSidecar() throws {
+        try makeSkill("with-origin", in: tempDir)
+        let source = tempDir.appending(path: "with-origin")
+        let skillsDir = tempDir.appending(path: "skills")
+        let candidate = InstallCandidate(
+            name: "with-origin",
+            sourceDirectory: source,
+            origin: SkillOrigin(sourceURL: "https://github.com/o/r", commit: "1234567")
+        )
+        try SkillInstaller.install(candidate: candidate, intoDirectory: skillsDir, tool: .codex, overwrite: false)
+        let installed = skillsDir.appending(path: "with-origin")
+        #expect(SkillOrigin.read(from: installed)?.commit == "1234567")
+    }
+
+    @Test func bundledIndexLoadsAndEntriesParse() {
+        let entries = SkillIndexLoader.bundled()
+        #expect(!entries.isEmpty)
+        for entry in entries {
+            #expect(SkillInstaller.parseGitHubURL(entry.url) != nil, "index entry url must be installable: \(entry.url)")
+        }
+    }
+
+    @Test func exportZipRoundTrips() throws {
+        try makeSkill("exportable", in: tempDir)
+        let outDir = tempDir.appending(path: "out")
+        try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
+
+        let zip = try SkillInstaller.exportZip(
+            of: tempDir.appending(path: "exportable"), to: outDir
+        )
+        #expect(zip.lastPathComponent == "exportable.zip")
+
+        // Re-import the exported zip to prove it's a valid skill archive.
+        let candidates = try SkillInstaller.prepareImport(from: zip)
+        #expect(candidates.count == 1)
+        #expect(candidates.first?.name == "exportable")
+    }
+}
+
 // MARK: - Localization
 
 @Suite struct LocalizationTests {

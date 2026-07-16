@@ -63,7 +63,8 @@ public enum SkillScanner {
             hasSkillFile: hasSkillFile,
             hasValidMetadata: metadata?.name != nil,
             sizeBytes: directorySize(url),
-            modifiedDate: modified
+            modifiedDate: modified,
+            origin: SkillOrigin.read(from: url)
         )
     }
 

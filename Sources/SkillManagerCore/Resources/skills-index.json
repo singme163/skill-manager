@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Anthropic 官方 Skills",
+    "description": "Anthropic 官方 skill 集合：docx / pdf / pptx / xlsx 文档处理等，Claude Code 与兼容工具通用。仓库内含多个 skill，安装时可勾选。",
+    "author": "Anthropic",
+    "url": "https://github.com/anthropics/skills",
+    "tags": ["official", "documents"]
+  },
+  {
+    "name": "Superpowers",
+    "description": "社区知名的 skill 与工作流集合，覆盖头脑风暴、计划执行、调试等软件工程实践。",
+    "author": "Jesse Vincent (obra)",
+    "url": "https://github.com/obra/superpowers",
+    "tags": ["workflow", "collection"]
+  }
+]

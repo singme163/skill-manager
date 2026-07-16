@@ -40,12 +40,15 @@ struct ContentView: View {
     @AppStorage("hasSeenWelcome") private var hasSeenWelcome = false
 
     @State private var filter: SidebarFilter = .all
-    @State private var selectedSkillID: Skill.ID?
+    @State private var selectedSkillIDs = Set<Skill.ID>()
     @State private var searchText = ""
     @State private var sortOrder: SortOrder = .name
 
     @State private var showNewSkillSheet = false
     @State private var showGitHubSheet = false
+    @State private var showDiscovery = false
+    @State private var batchDeleteSkills: [Skill]?
+    @State private var showExportPicker = false
     @State private var showImporter = false
     @State private var showProjectImporter = false
     @State private var pendingInstall: PendingInstall?
@@ -66,6 +69,11 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showNewSkillSheet) {
             NewSkillSheet()
+        }
+        .sheet(isPresented: $showDiscovery) {
+            DiscoverySheet { candidates in
+                pendingInstall = PendingInstall(candidates: candidates)
+            }
         }
         .sheet(isPresented: $showGitHubSheet) {
             GitHubInstallSheet { candidates in
@@ -108,6 +116,24 @@ struct ContentView: View {
             titleVisibility: .visible
         ) {
             deleteDialogButtons
+        } message: {
+            Text(L("skill 目录会被移入废纸篓，可随时恢复。"))
+        }
+        .confirmationDialog(
+            L("删除 \(batchDeleteSkills?.count ?? 0) 个 skill？"),
+            isPresented: Binding(
+                get: { batchDeleteSkills != nil },
+                set: { if !$0 { batchDeleteSkills = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(L("删除（移入废纸篓）"), role: .destructive) {
+                let copies = (batchDeleteSkills ?? []).flatMap(\.writableCopies)
+                Task {
+                    for copy in copies { await store.trash(copy) }
+                }
+            }
+            Button(L("取消"), role: .cancel) {}
         } message: {
             Text(L("skill 目录会被移入废纸篓，可随时恢复。"))
         }
@@ -169,14 +195,28 @@ struct ContentView: View {
             if filteredSkills.isEmpty {
                 emptyState
             } else {
-                List(filteredSkills, selection: $selectedSkillID) { skill in
+                List(filteredSkills, selection: $selectedSkillIDs) { skill in
                     SkillRowView(skill: skill)
                         .tag(skill.id)
-                        .contextMenu { rowContextMenu(for: skill) }
+                }
+                .contextMenu(forSelectionType: Skill.ID.self) { ids in
+                    let skills = skills(for: ids)
+                    if skills.count == 1, let skill = skills.first {
+                        rowContextMenu(for: skill)
+                    } else if skills.count > 1 {
+                        batchContextMenu(for: skills)
+                    }
                 }
                 .onDeleteCommand {
-                    if let skill = selectedSkill, !skill.writableCopies.isEmpty {
-                        deleteTarget = skill
+                    requestDeleteForSelection()
+                }
+                .fileImporter(
+                    isPresented: $showExportPicker,
+                    allowedContentTypes: [.folder],
+                    allowsMultipleSelection: false
+                ) { result in
+                    if case .success(let urls) = result, let folder = urls.first {
+                        exportSelection(to: folder)
                     }
                 }
             }
@@ -193,6 +233,12 @@ struct ContentView: View {
             SkillDetailView(skill: skill) { target in
                 deleteTarget = target
             }
+        } else if selectedSkillIDs.count > 1 {
+            ContentUnavailableView(
+                L("已选择 \(selectedSkillIDs.count) 个 skill"),
+                systemImage: "square.stack.3d.up",
+                description: Text(L("右键进行批量删除、复制或导出"))
+            )
         } else {
             ContentUnavailableView(
                 L("选择一个 skill"),
@@ -231,6 +277,7 @@ struct ContentView: View {
                 Button(L("新建空白 Skill…")) { showNewSkillSheet = true }
                 Button(L("导入文件夹 / zip…")) { showImporter = true }
                 Button(L("从 GitHub 安装…")) { showGitHubSheet = true }
+                Button(L("发现 Skill…")) { showDiscovery = true }
                 Divider()
                 Button(L("添加项目目录…")) { showProjectImporter = true }
             } label: {
@@ -320,7 +367,82 @@ struct ContentView: View {
     }
 
     private var selectedSkill: Skill? {
-        filteredSkills.first { $0.id == selectedSkillID }
+        guard selectedSkillIDs.count == 1, let id = selectedSkillIDs.first else { return nil }
+        return filteredSkills.first { $0.id == id }
+    }
+
+    private func skills(for ids: Set<Skill.ID>) -> [Skill] {
+        filteredSkills.filter { ids.contains($0.id) }
+    }
+
+    private func requestDeleteForSelection() {
+        let skills = skills(for: selectedSkillIDs).filter { !$0.writableCopies.isEmpty }
+        if skills.count == 1 {
+            deleteTarget = skills[0]
+        } else if skills.count > 1 {
+            batchDeleteSkills = skills
+        }
+    }
+
+    @ViewBuilder
+    private func batchContextMenu(for skills: [Skill]) -> some View {
+        ForEach(store.writableTools) { target in
+            Button(L("复制到 \(target.displayName)")) {
+                Task { await batchCopy(skills, to: target) }
+            }
+        }
+        Divider()
+        Button(L("导出 zip…")) { showExportPicker = true }
+        if skills.contains(where: { !$0.writableCopies.isEmpty }) {
+            Divider()
+            Button(L("删除…"), role: .destructive) {
+                batchDeleteSkills = skills.filter { !$0.writableCopies.isEmpty }
+            }
+        }
+    }
+
+    private func batchCopy(_ skills: [Skill], to target: Tool) async {
+        var copied = 0
+        var skipped = 0
+        for skill in skills {
+            guard skill.copy(for: target) == nil,
+                  let source = skill.writableCopies.first ?? skill.copies.first else {
+                skipped += 1
+                continue
+            }
+            if await store.copySkill(source, to: target, overwrite: false) {
+                copied += 1
+            } else {
+                skipped += 1
+            }
+        }
+        store.showToast(Toast(L("已复制 \(copied) 个，跳过 \(skipped) 个（已存在或冲突）")))
+    }
+
+    private func exportSelection(to folder: URL) {
+        let skills = skills(for: selectedSkillIDs)
+        Task.detached {
+            var exported = 0
+            var failure: String?
+            for skill in skills {
+                guard let copy = skill.writableCopies.first ?? skill.copies.first else { continue }
+                do {
+                    try SkillInstaller.exportZip(of: copy.directoryURL, to: folder)
+                    exported += 1
+                } catch {
+                    failure = error.localizedDescription
+                }
+            }
+            let done = exported
+            let err = failure
+            await MainActor.run {
+                if let err {
+                    store.showToast(Toast(L("导出失败：\(err)"), style: .error))
+                } else {
+                    store.showToast(Toast(L("已导出 \(done) 个 zip")))
+                }
+            }
+        }
     }
 
     private func stageImport(of urls: [URL]) {

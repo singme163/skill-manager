@@ -11,6 +11,8 @@ public struct SkillCopy: Identifiable, Hashable, Sendable {
     public let hasValidMetadata: Bool
     public let sizeBytes: Int64
     public let modifiedDate: Date
+    /// Provenance recorded at install time (nil for hand-made skills).
+    public let origin: SkillOrigin?
 
     public init(
         tool: Tool,
@@ -21,7 +23,8 @@ public struct SkillCopy: Identifiable, Hashable, Sendable {
         hasSkillFile: Bool,
         hasValidMetadata: Bool,
         sizeBytes: Int64,
-        modifiedDate: Date
+        modifiedDate: Date,
+        origin: SkillOrigin? = nil
     ) {
         self.tool = tool
         self.directoryURL = directoryURL
@@ -32,6 +35,7 @@ public struct SkillCopy: Identifiable, Hashable, Sendable {
         self.hasValidMetadata = hasValidMetadata
         self.sizeBytes = sizeBytes
         self.modifiedDate = modifiedDate
+        self.origin = origin
     }
 
     public var id: String { "\(tool.id):\(folderName)" }

@@ -3,10 +3,13 @@ import Foundation
 public struct InstallCandidate: Identifiable, Hashable, Sendable {
     public let name: String
     public let sourceDirectory: URL
+    /// Provenance to record on install (set by the GitHub pipeline).
+    public var origin: SkillOrigin?
 
-    public init(name: String, sourceDirectory: URL) {
+    public init(name: String, sourceDirectory: URL, origin: SkillOrigin? = nil) {
         self.name = name
         self.sourceDirectory = sourceDirectory
+        self.origin = origin
     }
 
     public var id: String { sourceDirectory.path }
@@ -121,6 +124,9 @@ public enum SkillInstaller {
             try fm.trashItem(at: destination, resultingItemURL: nil)
         }
         try fm.copyItem(at: candidate.sourceDirectory, to: destination)
+        if let origin = candidate.origin {
+            try? origin.write(to: destination)
+        }
     }
 
     // MARK: - New blank template
@@ -213,9 +219,10 @@ public enum SkillInstaller {
     public static func downloadFromGitHub(_ raw: String) async throws -> [InstallCandidate] {
         guard let target = parseGitHubURL(raw) else { throw InstallError.invalidGitHubURL }
 
-        let (data, response) = try await URLSession.shared.data(from: target.zipballURL)
+        let request = GitHubAuth.request(for: target.zipballURL)
+        let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw InstallError.downloadFailed(L("HTTP \(http.statusCode)（仅支持公开仓库，请检查链接与网络）"))
+            throw InstallError.downloadFailed(L("HTTP \(http.statusCode)（私有仓库需在设置中配置 GitHub Token，请检查链接与网络）"))
         }
 
         let tempDir = try makeTempDirectory()
@@ -233,17 +240,71 @@ public enum SkillInstaller {
             options: [.skipsHiddenFiles]
         )) ?? []
         var searchRoot = extractDir
+        var commit: String?
         if topLevel.count == 1,
            (try? topLevel[0].resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
             searchRoot = topLevel[0]
+            // The wrapper folder is "<owner>-<repo>-<sha>" — harvest the sha.
+            commit = shaSuffix(of: searchRoot.lastPathComponent)
         }
         if let subpath = target.subpath {
             searchRoot = searchRoot.appending(path: subpath)
         }
 
+        let origin = SkillOrigin(
+            sourceURL: raw.trimmingCharacters(in: .whitespacesAndNewlines),
+            ref: target.ref,
+            commit: commit
+        )
         let roots = findSkillRoots(in: searchRoot)
         guard !roots.isEmpty else { throw InstallError.noSkillFound }
-        return roots.map { InstallCandidate(name: $0.lastPathComponent, sourceDirectory: $0) }
+        return roots.map {
+            InstallCandidate(name: $0.lastPathComponent, sourceDirectory: $0, origin: origin)
+        }
+    }
+
+    /// Extracts the trailing commit sha from a zipball wrapper folder name
+    /// ("owner-repo-abc1234"). Returns nil when the suffix isn't hex-like.
+    static func shaSuffix(of wrapperFolderName: String) -> String? {
+        guard let last = wrapperFolderName.split(separator: "-").last else { return nil }
+        let sha = String(last)
+        let isHex = sha.count >= 7 && sha.allSatisfy { $0.isHexDigit }
+        return isHex ? sha : nil
+    }
+
+    /// Latest commit sha upstream for an installed skill's source.
+    /// Uses the GitHub "sha" media type, which returns the bare sha.
+    public static func latestCommit(for target: GitHubTarget) async throws -> String {
+        let url = URL(string: "https://api.github.com/repos/\(target.owner)/\(target.repo)/commits/\(target.ref ?? "HEAD")")!
+        var request = GitHubAuth.request(for: url)
+        request.setValue("application/vnd.github.sha", forHTTPHeaderField: "Accept")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200,
+              let sha = String(data: data, encoding: .utf8)?
+                  .trimmingCharacters(in: .whitespacesAndNewlines),
+              !sha.isEmpty else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw InstallError.downloadFailed("HTTP \(code)")
+        }
+        return sha
+    }
+
+    // MARK: - Export
+
+    /// Zips a skill folder into `destinationFolder/<name>.zip` (overwriting).
+    @discardableResult
+    public static func exportZip(of skillDirectory: URL, to destinationFolder: URL) throws -> URL {
+        let zipURL = destinationFolder.appending(path: "\(skillDirectory.lastPathComponent).zip")
+        try? FileManager.default.removeItem(at: zipURL)
+        let process = Process()
+        process.executableURL = URL(filePath: "/usr/bin/ditto")
+        process.arguments = ["-c", "-k", "--keepParent", skillDirectory.path, zipURL.path]
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw InstallError.unzipFailed("ditto exit \(process.terminationStatus)")
+        }
+        return zipURL
     }
 
     // MARK: - Helpers
