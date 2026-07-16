@@ -1,5 +1,7 @@
 # Skill Manager
 
+[![CI](https://github.com/singme163/skill-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/singme163/skill-manager/actions/workflows/ci.yml)
+
 macOS 原生（SwiftUI）的 skill 管理工具，统一管理本机 **Claude Code**（`~/.claude/skills/`）与 **Codex**（`~/.codex/skills/`）的 Agent Skill。
 
 > **English**: Skill Manager is a native macOS (SwiftUI) app for managing Agent Skills across Claude Code and Codex — browse and search skills from both tools in one window, install from local folders / zip / GitHub repos, copy skills between tools with one click, edit SKILL.md with frontmatter validation, and delete safely to Trash. Requires macOS 14+. Build with `Scripts/make-app.sh` (Command Line Tools are enough, no Xcode needed).
