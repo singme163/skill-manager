@@ -175,11 +175,18 @@ public final class SkillStore: ObservableObject {
     }
 
     /// Creates a blank skill from the template. Returns the created folder name on success.
-    public func createTemplate(name: String, description: String, tools: [Tool]) async -> Bool {
+    public func createTemplate(
+        name: String,
+        description: String,
+        template: SkillTemplate = .basic,
+        tools: [Tool]
+    ) async -> Bool {
         var succeeded = false
         for tool in tools {
             do {
-                try SkillInstaller.createTemplate(name: name, description: description, tool: tool)
+                try SkillInstaller.createTemplate(
+                    name: name, description: description, template: template, tool: tool
+                )
                 succeeded = true
             } catch {
                 showToast(Toast(error.localizedDescription, style: .error))
@@ -212,6 +219,11 @@ public final class SkillStore: ObservableObject {
 
     public func saveSkillFile(_ copy: SkillCopy, contents: String) async -> Bool {
         do {
+            // Snapshot the on-disk version first so the edit can be rolled back.
+            if let existing = try? String(contentsOf: copy.skillFileURL, encoding: .utf8),
+               existing != contents {
+                try? SnapshotStore.save(contents: existing, for: copy)
+            }
             try contents.write(to: copy.skillFileURL, atomically: true, encoding: .utf8)
             showToast(Toast(L("已保存 \(copy.folderName)/SKILL.md")))
             await refresh()

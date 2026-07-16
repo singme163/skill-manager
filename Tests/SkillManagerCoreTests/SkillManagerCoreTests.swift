@@ -248,6 +248,161 @@ import Foundation
     }
 }
 
+// MARK: - Editing & quality (v1.5)
+
+@Suite final class SkillLinterTests {
+    let tempDir: URL
+
+    init() throws {
+        tempDir = try SkillInstaller.makeTempDirectory()
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: tempDir)
+    }
+
+    @Test func healthySkillHasNoIssues() {
+        let md = """
+        ---
+        name: healthy-skill
+        description: Formats commit messages. Use when the user asks for a conventional commit summary.
+        ---
+
+        # Healthy Skill
+
+        Do the thing step by step.
+        """
+        let issues = SkillLinter.lint(markdown: md, folderName: "healthy-skill", directory: nil)
+        #expect(issues.isEmpty)
+    }
+
+    @Test func flagsMissingFrontmatterAndDescription() {
+        let noFM = SkillLinter.lint(markdown: "# hi\n\nbody", folderName: "x", directory: nil)
+        #expect(noFM.contains { $0.ruleID == "frontmatter-missing" && $0.severity == .error })
+
+        let noDesc = SkillLinter.lint(
+            markdown: "---\nname: x\n---\n\nbody here",
+            folderName: "x",
+            directory: nil
+        )
+        #expect(noDesc.contains { $0.ruleID == "description-missing" && $0.severity == .error })
+    }
+
+    @Test func flagsNameMismatchShortDescriptionAndEmptyBody() {
+        let md = """
+        ---
+        name: other-name
+        description: too short
+        ---
+        """
+        let issues = SkillLinter.lint(markdown: md, folderName: "folder-name", directory: nil)
+        #expect(issues.contains { $0.ruleID == "name-mismatch" })
+        #expect(issues.contains { $0.ruleID == "description-short" })
+        #expect(issues.contains { $0.ruleID == "body-empty" })
+    }
+
+    @Test func flagsBrokenRelativeLinksOnly() throws {
+        try makeSkill("linked", in: tempDir)
+        let dir = tempDir.appending(path: "linked")
+        try FileManager.default.createDirectory(
+            at: dir.appending(path: "references"), withIntermediateDirectories: true
+        )
+        try "ok".write(to: dir.appending(path: "references/good.md"), atomically: true, encoding: .utf8)
+
+        let md = """
+        ---
+        name: linked
+        description: Links checker fixture. Use when testing relative links.
+        ---
+
+        [good](references/good.md)
+        [missing](references/missing.md)
+        [external](https://example.com/x.md)
+        [anchor](#section)
+        """
+        let issues = SkillLinter.lint(markdown: md, folderName: "linked", directory: dir)
+        let broken = issues.filter { $0.ruleID == "broken-link" }
+        #expect(broken.count == 1)
+        #expect(broken.first?.message.contains("references/missing.md") == true)
+    }
+
+    @Test func settingKeyRewritesPlainAndFoldedValues() {
+        let plain = """
+        ---
+        name: old-name
+        description: old description
+        ---
+
+        body
+        """
+        let renamed = FrontmatterParser.settingKey("name", to: "new-name", in: plain)
+        #expect(FrontmatterParser.parse(markdown: renamed)?.name == "new-name")
+        #expect(FrontmatterParser.parse(markdown: renamed)?.description == "old description")
+        #expect(renamed.contains("body"))
+
+        let folded = """
+        ---
+        name: x
+        description: >
+          line one
+          line two
+        ---
+        """
+        let rewritten = FrontmatterParser.settingKey("description", to: "single line now", in: folded)
+        #expect(FrontmatterParser.parse(markdown: rewritten)?.description == "single line now")
+        #expect(FrontmatterParser.parse(markdown: rewritten)?.name == "x")
+
+        // Missing key gets inserted.
+        let inserted = FrontmatterParser.settingKey("description", to: "added", in: "---\nname: x\n---\nbody")
+        #expect(FrontmatterParser.parse(markdown: inserted)?.description == "added")
+    }
+
+    @Test func snapshotSaveListPruneAndRead() throws {
+        try makeSkill("snappy", in: tempDir)
+        let copy = SkillScanner.scan(directory: tempDir, tool: .claudeCode)[0]
+        let root = tempDir.appending(path: "snap-root")
+
+        for index in 0..<25 {
+            try SnapshotStore.save(contents: "version \(index)", for: copy, root: root)
+        }
+        let snapshots = SnapshotStore.snapshots(for: copy, root: root)
+        #expect(snapshots.count == SnapshotStore.maxPerSkill)
+        #expect(SnapshotStore.read(snapshots[0]) == "version 24")
+    }
+
+    @Test func templatesScaffoldParseableSkills() throws {
+        for template in SkillTemplate.allCases {
+            let skillsDir = tempDir.appending(path: "templates-\(template.rawValue)")
+            let created = try SkillInstaller.createTemplate(
+                name: "demo-\(template.rawValue)",
+                description: "Template fixture. Use when testing templates.",
+                template: template,
+                inDirectory: skillsDir,
+                tool: .claudeCode
+            )
+            let text = try String(contentsOf: created.appending(path: "SKILL.md"), encoding: .utf8)
+            #expect(FrontmatterParser.parse(markdown: text)?.name == "demo-\(template.rawValue)")
+
+            for file in template.extraFiles {
+                let url = created.appending(path: file.path)
+                #expect(FileManager.default.fileExists(atPath: url.path), "\(file.path) should exist")
+                if file.executable {
+                    let perms = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
+                    #expect(perms == 0o755)
+                }
+            }
+
+            // Scaffolded skills pass their own lint (relative links resolve).
+            let issues = SkillLinter.lint(
+                markdown: text,
+                folderName: created.lastPathComponent,
+                directory: created
+            )
+            #expect(issues.filter { $0.severity == .error }.isEmpty, "template \(template.rawValue): \(issues)")
+        }
+    }
+}
+
 // MARK: - Localization
 
 @Suite struct LocalizationTests {

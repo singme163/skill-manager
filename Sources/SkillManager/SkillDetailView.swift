@@ -17,12 +17,16 @@ struct SkillDetailView: View {
     @State private var updateStatus: SkillStore.UpdateCheckResult?
     @State private var isCheckingUpdate = false
     @State private var isUpdating = false
+    @State private var fmName = ""
+    @State private var fmDescription = ""
+    @State private var showHistorySheet = false
 
     enum DetailMode: String, CaseIterable, Identifiable {
         case preview
         case edit
         case files
         case usage
+        case lint
 
         var id: String { rawValue }
 
@@ -32,13 +36,14 @@ struct SkillDetailView: View {
             case .edit: return L("编辑")
             case .files: return L("文件")
             case .usage: return L("用法")
+            case .lint: return L("检查")
             }
         }
     }
 
     /// Read-only sources hide the editor.
     private var availableModes: [DetailMode] {
-        currentCopy.tool.isReadOnly ? [.preview, .files, .usage] : DetailMode.allCases
+        currentCopy.tool.isReadOnly ? [.preview, .files, .usage, .lint] : DetailMode.allCases
     }
 
     private var currentCopy: SkillCopy {
@@ -58,6 +63,7 @@ struct SkillDetailView: View {
         }
         .task(id: currentCopy.id) {
             loadEditorText()
+            syncFormFromEditor()
             if !availableModes.contains(mode) {
                 mode = .preview
             }
@@ -266,17 +272,21 @@ struct SkillDetailView: View {
             fileList
         case .usage:
             usageView
+        case .lint:
+            lintView
         }
     }
 
     private var editor: some View {
         VStack(spacing: 0) {
-            TextEditor(text: $editorText)
-                .font(.body.monospaced())
-                .scrollContentBackground(.hidden)
-                .padding(8)
+            if FrontmatterParser.parseKeys(markdown: editorText) != nil {
+                frontmatterForm
+                Divider()
+            }
+            MarkdownTextEditor(text: $editorText)
             Divider()
             HStack {
+                Button(L("历史…")) { showHistorySheet = true }
                 if hasUnsavedChanges {
                     Text(L("未保存的修改"))
                         .font(.caption)
@@ -293,6 +303,97 @@ struct SkillDetailView: View {
                 .disabled(!hasUnsavedChanges)
             }
             .padding(10)
+        }
+        .onChange(of: editorText) { syncFormFromEditor() }
+        .sheet(isPresented: $showHistorySheet) {
+            SnapshotHistorySheet(copy: currentCopy) { restored in
+                editorText = restored
+            }
+        }
+    }
+
+    /// Structured editing for the two frontmatter keys tools care about.
+    private var frontmatterForm: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField(L("名称"), text: $fmName)
+                .textFieldStyle(.roundedBorder)
+                .font(.callout.monospaced())
+                .onChange(of: fmName) { applyFormToEditor(key: "name", value: fmName) }
+            TextField(L("描述"), text: $fmDescription, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .font(.callout)
+                .lineLimit(1...3)
+                .onChange(of: fmDescription) { applyFormToEditor(key: "description", value: fmDescription) }
+        }
+        .padding(10)
+    }
+
+    private func syncFormFromEditor() {
+        let meta = FrontmatterParser.parse(markdown: editorText)
+        let name = meta?.name ?? ""
+        let description = meta?.description ?? ""
+        if fmName != name { fmName = name }
+        if fmDescription != description { fmDescription = description }
+    }
+
+    private func applyFormToEditor(key: String, value: String) {
+        let current: String?
+        switch key {
+        case "name": current = FrontmatterParser.parse(markdown: editorText)?.name
+        default: current = FrontmatterParser.parse(markdown: editorText)?.description
+        }
+        let singleLine = value.replacingOccurrences(of: "\n", with: " ")
+        guard (current ?? "") != singleLine else { return }
+        editorText = FrontmatterParser.settingKey(key, to: singleLine, in: editorText)
+    }
+
+    private var lintView: some View {
+        let issues = SkillLinter.lint(
+            markdown: hasUnsavedChanges ? editorText : loadedText,
+            folderName: currentCopy.directoryURL.lastPathComponent,
+            directory: currentCopy.directoryURL
+        ).sorted { $0.severity > $1.severity }
+
+        return Group {
+            if issues.isEmpty {
+                ContentUnavailableView {
+                    Label(L("全部通过"), systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(.green)
+                } description: {
+                    Text(L("没有发现问题，这个 skill 的元数据和引用都很健康。"))
+                }
+            } else {
+                List(issues) { issue in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: symbolName(for: issue.severity))
+                            .foregroundStyle(color(for: issue.severity))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(issue.message)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(issue.ruleID)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
+    private func symbolName(for severity: LintIssue.Severity) -> String {
+        switch severity {
+        case .error: return "xmark.octagon.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .info: return "info.circle.fill"
+        }
+    }
+
+    private func color(for severity: LintIssue.Severity) -> Color {
+        switch severity {
+        case .error: return .red
+        case .warning: return .yellow
+        case .info: return .blue
         }
     }
 

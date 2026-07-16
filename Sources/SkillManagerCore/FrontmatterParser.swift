@@ -105,6 +105,46 @@ public enum FrontmatterParser {
         """
     }
 
+    /// Rewrites (or inserts) a top-level frontmatter key with a single-line
+    /// value, preserving the rest of the document. Folded/literal blocks are
+    /// collapsed into the new single-line value. Returns the input unchanged
+    /// when there is no terminated frontmatter block.
+    public static func settingKey(_ key: String, to value: String, in markdown: String) -> String {
+        var lines = markdown.components(separatedBy: "\n")
+        guard let first = lines.first, first.trimmingCharacters(in: .whitespaces) == "---" else {
+            return markdown
+        }
+        guard let closing = (1..<lines.count).first(where: {
+            lines[$0].trimmingCharacters(in: .whitespaces) == "---"
+        }) else {
+            return markdown
+        }
+
+        let newLine = "\(key): \(value)"
+        var index = 1
+        while index < closing {
+            let line = lines[index]
+            if !line.hasPrefix(" "), !line.hasPrefix("\t"),
+               let colon = line.firstIndex(of: ":"),
+               String(line[line.startIndex..<colon]).trimmingCharacters(in: .whitespaces) == key {
+                // Swallow indented continuation lines of folded/literal blocks.
+                var end = index + 1
+                while end < closing,
+                      lines[end].hasPrefix(" ") || lines[end].hasPrefix("\t")
+                      || lines[end].trimmingCharacters(in: .whitespaces).isEmpty {
+                    end += 1
+                }
+                lines.replaceSubrange(index..<end, with: [newLine])
+                return lines.joined(separator: "\n")
+            }
+            index += 1
+        }
+
+        // Key absent: insert just before the closing delimiter.
+        lines.insert(newLine, at: closing)
+        return lines.joined(separator: "\n")
+    }
+
     /// Validates a skill folder name: lowercase letters/digits, hyphen separated.
     public static func isValidSkillName(_ name: String) -> Bool {
         let pattern = /^[a-z0-9]+(-[a-z0-9]+)*$/

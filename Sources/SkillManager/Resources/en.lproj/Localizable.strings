@@ -172,3 +172,17 @@
 "已导出 %lld 个 zip" = "Exported %lld zip archive(s)";
 "导出失败：%@" = "Export failed: %@";
 "已复制 %lld 个，跳过 %lld 个（已存在或冲突）" = "Copied %1$lld, skipped %2$lld (already present or conflicting)";
+
+/* Editing & quality (v1.5) */
+"检查" = "Lint";
+"全部通过" = "All Checks Passed";
+"没有发现问题，这个 skill 的元数据和引用都很健康。" = "No issues found — this skill's metadata and references are healthy.";
+"历史…" = "History…";
+"编辑历史" = "Edit History";
+"每次在 App 内保存前会自动快照当前版本（每个 skill 最多保留 20 份）。" = "A snapshot of the current version is taken automatically before each in-app save (up to 20 per skill).";
+"还没有历史快照" = "No Snapshots Yet";
+"在 App 内保存过一次之后，这里就会出现可回滚的版本。" = "After you save once in the app, restorable versions will appear here.";
+"选择一个快照预览" = "Select a snapshot to preview";
+"载入编辑器" = "Load into Editor";
+"已载入快照，保存后生效" = "Snapshot loaded — save to apply";
+"模板" = "Template";

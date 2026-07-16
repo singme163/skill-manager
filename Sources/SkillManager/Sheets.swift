@@ -10,6 +10,7 @@ struct NewSkillSheet: View {
     @State private var name = ""
     @State private var descriptionText = ""
     @State private var targets: Set<Tool> = []
+    @State private var template: SkillTemplate = .basic
     @State private var isWorking = false
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
@@ -57,6 +58,18 @@ struct NewSkillSheet: View {
                 .foregroundStyle(.red)
             }
 
+            VStack(alignment: .leading, spacing: 6) {
+                Picker(L("模板"), selection: $template) {
+                    ForEach(SkillTemplate.allCases) { template in
+                        Text(template.displayName).tag(template)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text(template.summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             ToolTargetPicker(tools: store.writableTools, targets: $targets)
 
             HStack {
@@ -69,6 +82,7 @@ struct NewSkillSheet: View {
                         let ok = await store.createTemplate(
                             name: trimmedName,
                             description: descriptionText.trimmingCharacters(in: .whitespacesAndNewlines),
+                            template: template,
                             tools: Array(targets)
                         )
                         isWorking = false

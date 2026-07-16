@@ -135,6 +135,7 @@ public enum SkillInstaller {
     public static func createTemplate(
         name: String,
         description: String,
+        template: SkillTemplate = .basic,
         inDirectory skillsDir: URL,
         tool: Tool
     ) throws -> URL {
@@ -149,14 +150,31 @@ public enum SkillInstaller {
             throw InstallError.alreadyExists(name: name, tool: tool)
         }
         try fm.createDirectory(at: destination, withIntermediateDirectories: false)
-        let markdown = FrontmatterParser.templateSkillMarkdown(name: name, description: description)
+        let markdown = template.markdown(name: name, description: description)
         try markdown.write(to: destination.appending(path: "SKILL.md"), atomically: true, encoding: .utf8)
+
+        for file in template.extraFiles {
+            let fileURL = destination.appending(path: file.path)
+            try fm.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try file.contents.write(to: fileURL, atomically: true, encoding: .utf8)
+            if file.executable {
+                try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fileURL.path)
+            }
+        }
         return destination
     }
 
     @discardableResult
-    public static func createTemplate(name: String, description: String, tool: Tool) throws -> URL {
-        try createTemplate(name: name, description: description, inDirectory: tool.skillsDirectory, tool: tool)
+    public static func createTemplate(
+        name: String,
+        description: String,
+        template: SkillTemplate = .basic,
+        tool: Tool
+    ) throws -> URL {
+        try createTemplate(
+            name: name, description: description, template: template,
+            inDirectory: tool.skillsDirectory, tool: tool
+        )
     }
 
     // MARK: - Cross-tool copy

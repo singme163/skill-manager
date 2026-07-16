@@ -31,3 +31,22 @@
 "更新失败：%@" = "Update failed: %@";
 "未在上游找到「%@」" = "Couldn't find “%@” upstream";
 "HTTP %lld（私有仓库需在设置中配置 GitHub Token，请检查链接与网络）" = "HTTP %lld (for private repositories set a GitHub token in Settings — check the link and your network)";
+
+/* Lint & templates (v1.5) */
+"缺少 SKILL.md 文件" = "SKILL.md file is missing";
+"缺少合法的 frontmatter（文件需以 --- 包裹的元数据块开头）" = "Missing valid frontmatter (the file must start with a --- delimited metadata block)";
+"frontmatter 缺少 name 字段" = "Frontmatter is missing the name field";
+"frontmatter 缺少 description 字段，无法自动触发" = "Frontmatter is missing the description field, so auto-triggering can't work";
+"name「%@」与目录名「%@」不一致，工具可能无法识别" = "name “%1$@” doesn't match the folder name “%2$@”; tools may not recognize the skill";
+"name「%@」格式不规范（建议小写字母、数字、连字符）" = "name “%@” is non-standard (use lowercase letters, digits, and hyphens)";
+"description 过短（%lld 字符），触发关键词太少，自动触发容易失灵" = "description is too short (%lld characters) — too few trigger keywords for reliable auto-triggering";
+"description 过长（%lld 字符），建议精简到 1024 字符以内" = "description is too long (%lld characters); keep it within 1024";
+"description 未说明使用场景，建议包含「Use when …」或「用于/当…时使用」等触发提示" = "description doesn't state when to use the skill; add a trigger hint like “Use when …”";
+"正文为空，建议补充说明与步骤" = "The body is empty; add instructions and steps";
+"引用的文件不存在：%@" = "Referenced file doesn't exist: %@";
+"基础" = "Basic";
+"参考文档型" = "Reference";
+"脚本型" = "Scripted";
+"只有 SKILL.md 骨架，适合纯指令类 skill" = "Just a SKILL.md skeleton — for instruction-only skills";
+"附带 references/ 目录，适合需要背景资料的 skill" = "Includes a references/ folder — for skills that need background material";
+"附带 scripts/ 可执行脚本，适合调用工具的 skill" = "Includes an executable script under scripts/ — for tool-invoking skills";
