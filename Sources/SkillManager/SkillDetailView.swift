@@ -33,6 +33,11 @@ struct SkillDetailView: View {
         }
     }
 
+    /// Read-only sources hide the editor.
+    private var availableModes: [DetailMode] {
+        currentCopy.tool.isReadOnly ? [.preview, .files, .usage] : DetailMode.allCases
+    }
+
     private var currentCopy: SkillCopy {
         if let selectedTool, let copy = skill.copy(for: selectedTool) {
             return copy
@@ -50,6 +55,9 @@ struct SkillDetailView: View {
         }
         .task(id: currentCopy.id) {
             loadEditorText()
+            if !availableModes.contains(mode) {
+                mode = .preview
+            }
         }
         .alert(L("Frontmatter 校验未通过"), isPresented: $showForceSaveAlert) {
             Button(L("仍要保存"), role: .destructive) {
@@ -83,6 +91,12 @@ struct SkillDetailView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(currentCopy.displayName)
                     .font(.title2.weight(.semibold))
+                if currentCopy.tool.isReadOnly {
+                    Label(L("只读"), systemImage: "lock")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help(L("此来源为只读（由插件系统管理），不能编辑，可复制到其他工具使用。"))
+                }
                 Spacer()
                 ForEach(skill.tools) { tool in
                     ToolBadge(tool: tool)
@@ -147,7 +161,7 @@ struct SkillDetailView: View {
             }
 
             Picker(L("模式"), selection: $mode) {
-                ForEach(DetailMode.allCases) { mode in
+                ForEach(availableModes) { mode in
                     Text(mode.title).tag(mode)
                 }
             }
@@ -183,31 +197,46 @@ struct SkillDetailView: View {
             .help(L("用默认编辑器打开 SKILL.md"))
             .disabled(!currentCopy.hasSkillFile)
 
-            if let target = copyTargetTool {
+            if copyTargets.count == 1, let target = copyTargets.first {
                 Button {
-                    Task {
-                        let done = await store.copySkill(currentCopy, to: target, overwrite: false)
-                        if !done { overwriteCopyTarget = target }
-                    }
+                    copy(to: target)
                 } label: {
                     Label(L("复制到 \(target.displayName)"), systemImage: "arrow.right.doc.on.clipboard")
                 }
                 .help(L("复制到 \(target.displayName)"))
+            } else if copyTargets.count > 1 {
+                Menu {
+                    ForEach(copyTargets) { target in
+                        Button(L("复制到 \(target.displayName)")) { copy(to: target) }
+                    }
+                } label: {
+                    Label(L("复制到…"), systemImage: "arrow.right.doc.on.clipboard")
+                }
+                .help(L("复制到…"))
             }
 
-            Button(role: .destructive) {
-                onDelete(skill)
-            } label: {
-                Label(L("删除"), systemImage: "trash")
+            if !skill.writableCopies.isEmpty {
+                Button(role: .destructive) {
+                    onDelete(skill)
+                } label: {
+                    Label(L("删除"), systemImage: "trash")
+                }
+                .help(L("移入废纸篓"))
             }
-            .help(L("移入废纸篓"))
         }
     }
 
-    /// The other tool, offered as a copy destination (even if it already has
-    /// a copy — that flows into the overwrite confirmation).
-    private var copyTargetTool: Tool? {
-        Tool.allCases.first { $0 != currentCopy.tool }
+    /// Writable tools other than the current copy's, offered as copy
+    /// destinations (existing copies flow into the overwrite confirmation).
+    private var copyTargets: [Tool] {
+        store.writableTools.filter { $0.id != currentCopy.tool.id }
+    }
+
+    private func copy(to target: Tool) {
+        Task {
+            let done = await store.copySkill(currentCopy, to: target, overwrite: false)
+            if !done { overwriteCopyTarget = target }
+        }
     }
 
     // MARK: - Content

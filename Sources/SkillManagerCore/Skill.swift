@@ -34,7 +34,7 @@ public struct SkillCopy: Identifiable, Hashable, Sendable {
         self.modifiedDate = modifiedDate
     }
 
-    public var id: String { "\(tool.rawValue):\(folderName)" }
+    public var id: String { "\(tool.id):\(folderName)" }
     public var displayName: String { metadataName ?? folderName }
     public var skillFileURL: URL { directoryURL.appending(path: "SKILL.md") }
 }
@@ -46,10 +46,7 @@ public struct Skill: Identifiable, Hashable, Sendable {
 
     public init(folderName: String, copies: [SkillCopy]) {
         self.folderName = folderName
-        self.copies = copies.sorted { a, b in
-            let order = Tool.allCases
-            return (order.firstIndex(of: a.tool) ?? 0) < (order.firstIndex(of: b.tool) ?? 0)
-        }
+        self.copies = copies.sorted { $0.tool.sortOrder < $1.tool.sortOrder }
     }
 
     public var id: String { folderName }
@@ -61,7 +58,12 @@ public struct Skill: Identifiable, Hashable, Sendable {
     public var metadataMissing: Bool { copies.contains { !$0.hasValidMetadata } }
 
     public func copy(for tool: Tool) -> SkillCopy? {
-        copies.first { $0.tool == tool }
+        copies.first { $0.tool.id == tool.id }
+    }
+
+    /// Copies living in sources the user can modify (not read-only).
+    public var writableCopies: [SkillCopy] {
+        copies.filter { !$0.tool.isReadOnly }
     }
 
     /// Merge per-tool copies into unified skills, keyed by folder name.

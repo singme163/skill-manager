@@ -18,16 +18,57 @@ public struct Toast: Identifiable, Equatable, Sendable {
 @MainActor
 public final class SkillStore: ObservableObject {
     @Published public private(set) var skills: [Skill] = []
+    @Published public private(set) var tools: [Tool]
     @Published public private(set) var isLoading = false
     @Published public var toast: Toast?
 
     private var watchers: [DirectoryWatcher] = []
     private var toastDismissTask: Task<Void, Never>?
 
-    public init() {}
+    public init() {
+        tools = ToolRegistry.load()
+    }
+
+    public var writableTools: [Tool] {
+        tools.filter { !$0.isReadOnly }
+    }
 
     public func count(for tool: Tool) -> Int {
         skills.filter { $0.copy(for: tool) != nil }.count
+    }
+
+    // MARK: - Tool management
+
+    /// Presets not yet in the active list, offered by the "add tool" menu.
+    public var availablePresets: [Tool] {
+        Tool.presets.filter { preset in !tools.contains { $0.id == preset.id } }
+    }
+
+    public func addTool(_ tool: Tool) async {
+        guard !tools.contains(where: { $0.id == tool.id }) else { return }
+        var added = tool
+        added.sortOrder = (tools.map(\.sortOrder).max() ?? -1) + 1
+        tools.append(added)
+        persistToolsAndRescan()
+        await refresh()
+    }
+
+    public func removeTool(_ tool: Tool) async {
+        tools.removeAll { $0.id == tool.id }
+        persistToolsAndRescan()
+        await refresh()
+    }
+
+    public func updateToolPath(_ tool: Tool, to path: String) {
+        guard let index = tools.firstIndex(where: { $0.id == tool.id }) else { return }
+        tools[index].directoryPath = path
+        ToolRegistry.save(tools)
+    }
+
+    private func persistToolsAndRescan() {
+        tools.sort { $0.sortOrder < $1.sortOrder }
+        ToolRegistry.save(tools)
+        startWatching()
     }
 
     // MARK: - Scanning
@@ -35,14 +76,15 @@ public final class SkillStore: ObservableObject {
     public func refresh() async {
         isLoading = true
         defer { isLoading = false }
+        let tools = self.tools
         let copies = await Task.detached(priority: .userInitiated) {
-            Tool.allCases.flatMap { SkillScanner.scan(tool: $0) }
+            tools.flatMap { SkillScanner.scan(tool: $0) }
         }.value
         skills = Skill.merge(copies)
     }
 
     public func startWatching() {
-        watchers = Tool.allCases.compactMap { tool in
+        watchers = tools.compactMap { tool in
             DirectoryWatcher(url: tool.skillsDirectory) {
                 Task { @MainActor [weak self] in
                     await self?.refresh()
@@ -75,7 +117,7 @@ public final class SkillStore: ObservableObject {
             self.tool = tool
         }
 
-        public var id: String { "\(candidate.id)→\(tool.rawValue)" }
+        public var id: String { "\(candidate.id)→\(tool.id)" }
     }
 
     /// Installs each candidate into its target tool. Returns the requests that

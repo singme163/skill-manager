@@ -19,11 +19,14 @@ public enum InstallError: LocalizedError, Equatable {
     case downloadFailed(String)
     case unzipFailed(String)
     case invalidName(String)
+    case readOnlyTool(String)
 
     public var errorDescription: String? {
         switch self {
         case .noSkillFound:
             return L("没有找到包含 SKILL.md 的 skill 目录。")
+        case .readOnlyTool(let name):
+            return L("「\(name)」是只读来源，不能安装或修改。")
         case .alreadyExists(let name, let tool):
             return L("\(tool.displayName) 中已存在同名 skill「\(name)」。")
         case .invalidGitHubURL:
@@ -97,6 +100,7 @@ public enum SkillInstaller {
     // MARK: - Install
 
     public static func install(candidate: InstallCandidate, to tool: Tool, overwrite: Bool) throws {
+        guard !tool.isReadOnly else { throw InstallError.readOnlyTool(tool.displayName) }
         try install(candidate: candidate, intoDirectory: tool.skillsDirectory, tool: tool, overwrite: overwrite)
     }
 
@@ -152,7 +156,12 @@ public enum SkillInstaller {
     // MARK: - Cross-tool copy
 
     public static func copySkill(_ copy: SkillCopy, to tool: Tool, overwrite: Bool) throws {
-        let candidate = InstallCandidate(name: copy.folderName, sourceDirectory: copy.directoryURL)
+        // Use the physical folder name, not `folderName`: deep-scanned copies
+        // (plugin skills) carry a root-relative path there.
+        let candidate = InstallCandidate(
+            name: copy.directoryURL.lastPathComponent,
+            sourceDirectory: copy.directoryURL
+        )
         try install(candidate: candidate, to: tool, overwrite: overwrite)
     }
 

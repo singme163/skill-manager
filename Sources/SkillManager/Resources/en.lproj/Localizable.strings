@@ -25,7 +25,6 @@
 "删除 skill「%@」？" = "Delete skill “%@”?";
 "skill 目录会被移入废纸篓，可随时恢复。" = "The skill folder will be moved to the Trash and can be restored anytime.";
 "从 %@ 删除" = "Delete from %@";
-"从两者删除" = "Delete from Both";
 "取消" = "Cancel";
 "导入失败" = "Import Failed";
 "好" = "OK";
@@ -95,10 +94,7 @@
 "安装到" = "Install to";
 
 /* Settings */
-"Skills 目录" = "Skills Directories";
-"留空使用默认路径。修改后点击刷新或重新打开 App 生效。" = "Leave blank to use the default path. Rescan or relaunch the app after changing.";
 "立即重新扫描" = "Rescan Now";
-"当前生效：%@" = "Currently in effect: %@";
 
 /* Menus & about */
 "关于 Skill Manager" = "About Skill Manager";
@@ -119,3 +115,18 @@
 "已存在" = "exists";
 "不存在（安装首个 skill 时会自动创建）" = "missing (created automatically with your first install)";
 "开始使用" = "Get Started";
+
+/* Tool management (v1.2) */
+"工具" = "Tools";
+"添加工具" = "Add Tool";
+"自定义工具…" = "Custom Tool…";
+"自定义工具" = "Custom Tool";
+"任何遵循「目录/skill 名/SKILL.md」约定的工具都可以接入。" = "Any tool that follows the <directory>/<skill>/SKILL.md convention can be added.";
+"工具名称" = "Tool Name";
+"路径" = "Path";
+"移除" = "Remove";
+"只读" = "Read-Only";
+"此来源为只读（由插件系统管理），不能编辑，可复制到其他工具使用。" = "This source is read-only (managed by the plugin system). It can't be edited here, but you can copy skills out to other tools.";
+"复制到…" = "Copy to…";
+"从全部工具删除" = "Delete from All Tools";
+"内置工具不可移除；修改路径后点击重新扫描生效。" = "Built-in tools can't be removed. After changing a path, rescan to apply.";

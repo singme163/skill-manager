@@ -5,7 +5,22 @@ import Foundation
 /// listed, just flagged, so one bad skill never hides the rest.
 public enum SkillScanner {
     public static func scan(tool: Tool) -> [SkillCopy] {
-        scan(directory: tool.skillsDirectory, tool: tool)
+        tool.deepScan
+            ? deepScan(directory: tool.skillsDirectory, tool: tool)
+            : scan(directory: tool.skillsDirectory, tool: tool)
+    }
+
+    /// Recursively finds every SKILL.md folder under `directory` (plugin
+    /// caches nest skills several levels deep). `folderName` becomes the
+    /// root-relative path so same-named skills from different plugins stay
+    /// distinct and never merge with regular skills.
+    public static func deepScan(directory: URL, tool: Tool, maxDepth: Int = 8) -> [SkillCopy] {
+        let rootPath = directory.standardizedFileURL.path + "/"
+        return SkillInstaller.findSkillRoots(in: directory, maxDepth: maxDepth).map { skillDir in
+            var relative = skillDir.standardizedFileURL.path
+            if relative.hasPrefix(rootPath) { relative.removeFirst(rootPath.count) }
+            return makeCopy(directory: skillDir, folderName: relative, tool: tool)
+        }
     }
 
     public static func scan(directory: URL, tool: Tool) -> [SkillCopy] {
@@ -22,30 +37,34 @@ public enum SkillScanner {
             guard (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else {
                 return nil
             }
-            let folderName = url.lastPathComponent
-            let skillFile = url.appending(path: "SKILL.md")
-            let hasSkillFile = fm.fileExists(atPath: skillFile.path)
-
-            var metadata: SkillMetadata?
-            if hasSkillFile, let text = try? String(contentsOf: skillFile, encoding: .utf8) {
-                metadata = FrontmatterParser.parse(markdown: text)
-            }
-
-            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? .distantPast
-
-            return SkillCopy(
-                tool: tool,
-                directoryURL: url,
-                folderName: folderName,
-                metadataName: metadata?.name,
-                metadataDescription: metadata?.description,
-                hasSkillFile: hasSkillFile,
-                hasValidMetadata: metadata?.name != nil,
-                sizeBytes: directorySize(url),
-                modifiedDate: modified
-            )
+            return makeCopy(directory: url, folderName: url.lastPathComponent, tool: tool)
         }
+    }
+
+    private static func makeCopy(directory url: URL, folderName: String, tool: Tool) -> SkillCopy {
+        let fm = FileManager.default
+        let skillFile = url.appending(path: "SKILL.md")
+        let hasSkillFile = fm.fileExists(atPath: skillFile.path)
+
+        var metadata: SkillMetadata?
+        if hasSkillFile, let text = try? String(contentsOf: skillFile, encoding: .utf8) {
+            metadata = FrontmatterParser.parse(markdown: text)
+        }
+
+        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate ?? .distantPast
+
+        return SkillCopy(
+            tool: tool,
+            directoryURL: url,
+            folderName: folderName,
+            metadataName: metadata?.name,
+            metadataDescription: metadata?.description,
+            hasSkillFile: hasSkillFile,
+            hasValidMetadata: metadata?.name != nil,
+            sizeBytes: directorySize(url),
+            modifiedDate: modified
+        )
     }
 
     public static func directorySize(_ url: URL) -> Int64 {

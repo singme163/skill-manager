@@ -135,7 +135,7 @@ struct ContentView: View {
                 Label(L("全部"), systemImage: "square.grid.2x2")
                     .badge(store.skills.count)
                     .tag(SidebarFilter.all)
-                ForEach(Tool.allCases) { tool in
+                ForEach(store.tools) { tool in
                     Label(tool.displayName, systemImage: tool.symbolName)
                         .badge(store.count(for: tool))
                         .tag(SidebarFilter.tool(tool))
@@ -156,7 +156,9 @@ struct ContentView: View {
                         .contextMenu { rowContextMenu(for: skill) }
                 }
                 .onDeleteCommand {
-                    if let skill = selectedSkill { deleteTarget = skill }
+                    if let skill = selectedSkill, !skill.writableCopies.isEmpty {
+                        deleteTarget = skill
+                    }
                 }
             }
         }
@@ -240,29 +242,30 @@ struct ContentView: View {
             }
         }
         Divider()
-        ForEach(skill.copies) { copy in
-            let others = Tool.allCases.filter { $0 != copy.tool && skill.copy(for: $0) == nil }
-            ForEach(others) { target in
+        if let source = skill.writableCopies.first ?? skill.copies.first {
+            ForEach(store.writableTools.filter { skill.copy(for: $0) == nil }) { target in
                 Button(L("复制到 \(target.displayName)")) {
-                    Task { _ = await store.copySkill(copy, to: target, overwrite: false) }
+                    Task { _ = await store.copySkill(source, to: target, overwrite: false) }
                 }
             }
         }
-        Divider()
-        Button(L("删除…"), role: .destructive) { deleteTarget = skill }
+        if !skill.writableCopies.isEmpty {
+            Divider()
+            Button(L("删除…"), role: .destructive) { deleteTarget = skill }
+        }
     }
 
     @ViewBuilder
     private var deleteDialogButtons: some View {
         if let skill = deleteTarget {
-            ForEach(skill.copies) { copy in
+            ForEach(skill.writableCopies) { copy in
                 Button(L("从 \(copy.tool.displayName) 删除"), role: .destructive) {
                     Task { await store.trash(copy) }
                 }
             }
-            if skill.copies.count > 1 {
-                Button(L("从两者删除"), role: .destructive) {
-                    let copies = skill.copies
+            if skill.writableCopies.count > 1 {
+                Button(L("从全部工具删除"), role: .destructive) {
+                    let copies = skill.writableCopies
                     Task {
                         for copy in copies { await store.trash(copy) }
                     }
@@ -361,16 +364,21 @@ struct SkillRowView: View {
 struct ToolBadge: View {
     let tool: Tool
 
+    private static let palette: [Color] = [.orange, .blue, .purple, .green, .pink, .teal, .indigo, .brown]
+
+    private var color: Color {
+        if tool.isReadOnly { return .gray }
+        let count = Self.palette.count
+        return Self.palette[((tool.sortOrder % count) + count) % count]
+    }
+
     var body: some View {
-        Text(tool == .claudeCode ? "Claude" : "Codex")
+        Text(tool.badge)
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(
-                (tool == .claudeCode ? Color.orange : Color.blue).opacity(0.18),
-                in: Capsule()
-            )
-            .foregroundStyle(tool == .claudeCode ? Color.orange : Color.blue)
+            .background(color.opacity(0.18), in: Capsule())
+            .foregroundStyle(color)
     }
 }
 

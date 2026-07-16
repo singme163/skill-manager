@@ -9,7 +9,7 @@ struct NewSkillSheet: View {
 
     @State private var name = ""
     @State private var descriptionText = ""
-    @State private var targets: Set<Tool> = [.claudeCode]
+    @State private var targets: Set<Tool> = []
     @State private var isWorking = false
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
@@ -57,7 +57,7 @@ struct NewSkillSheet: View {
                 .foregroundStyle(.red)
             }
 
-            ToolTargetPicker(targets: $targets)
+            ToolTargetPicker(tools: store.writableTools, targets: $targets)
 
             HStack {
                 Spacer()
@@ -82,6 +82,11 @@ struct NewSkillSheet: View {
         }
         .padding(20)
         .frame(width: 420)
+        .onAppear {
+            if targets.isEmpty, let first = store.writableTools.first {
+                targets = [first]
+            }
+        }
     }
 }
 
@@ -165,7 +170,7 @@ struct InstallCandidatesSheet: View {
     let candidates: [InstallCandidate]
 
     @State private var selectedCandidateIDs: Set<InstallCandidate.ID> = []
-    @State private var targets: Set<Tool> = [.claudeCode]
+    @State private var targets: Set<Tool> = []
     @State private var conflicts: [SkillStore.InstallRequest] = []
     @State private var showOverwriteConfirm = false
     @State private var isWorking = false
@@ -194,7 +199,7 @@ struct InstallCandidatesSheet: View {
             .frame(minHeight: 120, maxHeight: 220)
             .border(.quaternary)
 
-            ToolTargetPicker(targets: $targets)
+            ToolTargetPicker(tools: store.writableTools, targets: $targets)
 
             HStack {
                 Spacer()
@@ -212,6 +217,9 @@ struct InstallCandidatesSheet: View {
         .frame(width: 480)
         .onAppear {
             selectedCandidateIDs = Set(candidates.map(\.id))
+            if targets.isEmpty, let first = store.writableTools.first {
+                targets = [first]
+            }
         }
         .confirmationDialog(
             L("存在同名 skill"),
@@ -252,13 +260,14 @@ struct InstallCandidatesSheet: View {
 // MARK: - Shared target picker
 
 struct ToolTargetPicker: View {
+    let tools: [Tool]
     @Binding var targets: Set<Tool>
 
     var body: some View {
         HStack(spacing: 16) {
             Text(L("安装到"))
                 .foregroundStyle(.secondary)
-            ForEach(Tool.allCases) { tool in
+            ForEach(tools) { tool in
                 Toggle(tool.displayName, isOn: Binding(
                     get: { targets.contains(tool) },
                     set: { isOn in

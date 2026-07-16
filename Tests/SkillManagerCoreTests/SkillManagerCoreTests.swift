@@ -84,6 +84,50 @@ import Foundation
     }
 }
 
+// MARK: - Tool registry (v1.2)
+
+@Suite struct ToolRegistryTests {
+    private func freshDefaults() -> UserDefaults {
+        let suite = "test.toolRegistry.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
+    }
+
+    @Test func saveLoadRoundTrip() {
+        let defaults = freshDefaults()
+        let custom = ToolRegistry.makeCustomTool(
+            name: "Gemini CLI", directoryPath: "~/.gemini/skills", existing: [.claudeCode, .codex]
+        )
+        ToolRegistry.save([.claudeCode, .codex, custom], defaults: defaults)
+        let loaded = ToolRegistry.load(defaults: defaults)
+
+        #expect(loaded.count == 3)
+        #expect(loaded.map(\.id).prefix(2) == ["claudeCode", "codex"])
+        let reloadedCustom = loaded.first { $0.id == custom.id }
+        #expect(reloadedCustom?.name == "Gemini CLI")
+        #expect(reloadedCustom?.badge == "Gemini")
+        #expect(reloadedCustom?.sortOrder == 2)
+        #expect(reloadedCustom?.isBuiltIn == false)
+    }
+
+    @Test func firstRunAppliesLegacyPathOverride() {
+        let defaults = freshDefaults()
+        defaults.set("~/custom/claude-skills", forKey: Tool.claudeCode.pathOverrideDefaultsKey)
+        let tools = ToolRegistry.firstRunDefaults(defaults: defaults)
+
+        #expect(tools.contains { $0.id == "claudeCode" && $0.directoryPath == "~/custom/claude-skills" })
+        #expect(tools.contains { $0.id == "codex" && $0.directoryPath == "~/.codex/skills" })
+    }
+
+    @Test func presetsAreDistinctAndPluginSourceIsReadOnly() {
+        #expect(Set(Tool.presets.map(\.id)).count == Tool.presets.count)
+        #expect(Tool.claudePlugins.isReadOnly)
+        #expect(Tool.claudePlugins.deepScan)
+        #expect(!Tool.claudeCode.isReadOnly)
+    }
+}
+
 // MARK: - Localization
 
 @Suite struct LocalizationTests {
@@ -149,6 +193,30 @@ private func makeSkill(_ name: String, in dir: URL, markdown: String? = nil) thr
     @Test func scanMissingDirectoryReturnsEmpty() {
         let missing = tempDir.appending(path: "does-not-exist")
         #expect(SkillScanner.scan(directory: missing, tool: .codex).isEmpty)
+    }
+
+    @Test func deepScanFindsNestedSkillsWithRelativeNames() throws {
+        // Mimic the plugin cache layout: market/plugin/version/skills/<name>/SKILL.md
+        try makeSkill("pdf", in: tempDir.appending(path: "market/plugin-a/1.0/skills"))
+        try makeSkill("pdf", in: tempDir.appending(path: "market/plugin-b/2.0/skills"))
+
+        var pluginTool = Tool.claudePlugins
+        pluginTool.directoryPath = tempDir.path
+
+        let copies = SkillScanner.scan(tool: pluginTool)
+        #expect(copies.count == 2)
+        // Relative folder names keep same-named plugin skills distinct.
+        #expect(Set(copies.map(\.folderName)) == [
+            "market/plugin-a/1.0/skills/pdf",
+            "market/plugin-b/2.0/skills/pdf",
+        ])
+        #expect(copies.allSatisfy { $0.metadataName == "pdf" && $0.hasValidMetadata })
+
+        // And they never merge with a regular skill of the same name.
+        let flat = tempDir.appending(path: "flat")
+        try makeSkill("pdf", in: flat)
+        let merged = Skill.merge(copies + SkillScanner.scan(directory: flat, tool: .claudeCode))
+        #expect(merged.count == 3)
     }
 
     @Test func mergeAcrossTools() throws {

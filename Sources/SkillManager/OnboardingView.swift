@@ -4,6 +4,7 @@ import SkillManagerCore
 /// First-launch welcome sheet: what the app manages and where.
 /// Re-openable from the Help menu.
 struct WelcomeSheet: View {
+    @EnvironmentObject private var store: SkillStore
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -38,7 +39,7 @@ struct WelcomeSheet: View {
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(Tool.allCases) { tool in
+                    ForEach(store.tools) { tool in
                         directoryRow(tool)
                     }
                 }
