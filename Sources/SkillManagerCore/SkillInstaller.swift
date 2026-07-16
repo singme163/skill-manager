@@ -23,17 +23,17 @@ public enum InstallError: LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .noSkillFound:
-            return "没有找到包含 SKILL.md 的 skill 目录。"
+            return L("没有找到包含 SKILL.md 的 skill 目录。")
         case .alreadyExists(let name, let tool):
-            return "\(tool.displayName) 中已存在同名 skill「\(name)」。"
+            return L("\(tool.displayName) 中已存在同名 skill「\(name)」。")
         case .invalidGitHubURL:
-            return "无法识别的 GitHub 链接。支持仓库或仓库子目录链接，例如 https://github.com/org/repo 或 …/tree/main/skills/foo。"
+            return L("无法识别的 GitHub 链接。支持仓库或仓库子目录链接，例如 https://github.com/org/repo 或 …/tree/main/skills/foo。")
         case .downloadFailed(let reason):
-            return "下载失败：\(reason)"
+            return L("下载失败：\(reason)")
         case .unzipFailed(let reason):
-            return "解压失败：\(reason)"
+            return L("解压失败：\(reason)")
         case .invalidName(let name):
-            return "「\(name)」不是合法的 skill 名称（只允许小写字母、数字和连字符）。"
+            return L("「\(name)」不是合法的 skill 名称（只允许小写字母、数字和连字符）。")
         }
     }
 }
@@ -206,7 +206,7 @@ public enum SkillInstaller {
 
         let (data, response) = try await URLSession.shared.data(from: target.zipballURL)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw InstallError.downloadFailed("HTTP \(http.statusCode)（仅支持公开仓库，请检查链接与网络）")
+            throw InstallError.downloadFailed(L("HTTP \(http.statusCode)（仅支持公开仓库，请检查链接与网络）"))
         }
 
         let tempDir = try makeTempDirectory()

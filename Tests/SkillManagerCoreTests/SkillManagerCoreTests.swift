@@ -84,6 +84,25 @@ import Foundation
     }
 }
 
+// MARK: - Localization
+
+@Suite struct LocalizationTests {
+    @Test func localizationTablesLoadAndMatch() throws {
+        let zhURL = try #require(Bundle.module.url(
+            forResource: "Localizable", withExtension: "strings", subdirectory: nil, localization: "zh-Hans"
+        ))
+        let enURL = try #require(Bundle.module.url(
+            forResource: "Localizable", withExtension: "strings", subdirectory: nil, localization: "en"
+        ))
+        // NSDictionary parsing also validates .strings syntax.
+        let zh = try #require(NSDictionary(contentsOf: zhURL) as? [String: String])
+        let en = try #require(NSDictionary(contentsOf: enURL) as? [String: String])
+        #expect(!zh.isEmpty)
+        #expect(Set(zh.keys) == Set(en.keys))
+        #expect(en["下载失败：%@"] == "Download failed: %@")
+    }
+}
+
 // MARK: - Scanner
 
 private func makeSkill(_ name: String, in dir: URL, markdown: String? = nil) throws {

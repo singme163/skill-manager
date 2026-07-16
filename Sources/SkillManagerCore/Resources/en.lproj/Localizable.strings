@@ -1,0 +1,19 @@
+/* Install errors */
+"没有找到包含 SKILL.md 的 skill 目录。" = "No skill folder containing SKILL.md was found.";
+"%@ 中已存在同名 skill「%@」。" = "A skill named “%2$@” already exists in %1$@.";
+"无法识别的 GitHub 链接。支持仓库或仓库子目录链接，例如 https://github.com/org/repo 或 …/tree/main/skills/foo。" = "Unrecognized GitHub link. Repository or subdirectory links are supported, e.g. https://github.com/org/repo or …/tree/main/skills/foo.";
+"下载失败：%@" = "Download failed: %@";
+"解压失败：%@" = "Unzip failed: %@";
+"「%@」不是合法的 skill 名称（只允许小写字母、数字和连字符）。" = "“%@” is not a valid skill name (only lowercase letters, digits, and hyphens are allowed).";
+"HTTP %lld（仅支持公开仓库，请检查链接与网络）" = "HTTP %lld (only public repositories are supported — check the link and your network)";
+
+/* Toasts */
+"已将「%@」从 %@ 移入废纸篓" = "Moved “%1$@” from %2$@ to the Trash";
+"删除失败：%@" = "Delete failed: %@";
+"已安装 %lld 个 skill" = "Installed %lld skill(s)";
+"安装失败：%@" = "Install failed: %@";
+"已创建「%@」" = "Created “%@”";
+"已将「%@」复制到 %@" = "Copied “%1$@” to %2$@";
+"复制失败：%@" = "Copy failed: %@";
+"已保存 %@/SKILL.md" = "Saved %@/SKILL.md";
+"保存失败：%@" = "Save failed: %@";

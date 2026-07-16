@@ -9,17 +9,24 @@ enum SidebarFilter: Hashable {
 
     var title: String {
         switch self {
-        case .all: return "全部"
+        case .all: return L("全部")
         case .tool(let tool): return tool.displayName
         }
     }
 }
 
 enum SortOrder: String, CaseIterable, Identifiable {
-    case name = "按名称"
-    case modified = "按修改时间"
+    case name
+    case modified
 
     var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .name: return L("按名称")
+        case .modified: return L("按修改时间")
+        }
+    }
 }
 
 /// Candidates staged by import/GitHub download, awaiting target selection.
@@ -30,6 +37,7 @@ struct PendingInstall: Identifiable {
 
 struct ContentView: View {
     @EnvironmentObject private var store: SkillStore
+    @AppStorage("hasSeenWelcome") private var hasSeenWelcome = false
 
     @State private var filter: SidebarFilter = .all
     @State private var selectedSkillID: Skill.ID?
@@ -51,7 +59,10 @@ struct ContentView: View {
         } detail: {
             detail
         }
-        .searchable(text: $searchText, placement: .sidebar, prompt: "搜索 skill 名称或描述")
+        .searchable(text: $searchText, placement: .sidebar, prompt: Text(L("搜索 skill 名称或描述")))
+        .sheet(isPresented: welcomeBinding) {
+            WelcomeSheet()
+        }
         .sheet(isPresented: $showNewSkillSheet) {
             NewSkillSheet()
         }
@@ -77,18 +88,18 @@ struct ContentView: View {
             return true
         }
         .alert(
-            "导入失败",
+            L("导入失败"),
             isPresented: Binding(
                 get: { importErrorMessage != nil },
                 set: { if !$0 { importErrorMessage = nil } }
             )
         ) {
-            Button("好", role: .cancel) {}
+            Button(L("好"), role: .cancel) {}
         } message: {
             Text(importErrorMessage ?? "")
         }
         .confirmationDialog(
-            "删除 skill「\(deleteTarget?.displayName ?? "")」？",
+            L("删除 skill「\(deleteTarget?.displayName ?? "")」？"),
             isPresented: Binding(
                 get: { deleteTarget != nil },
                 set: { if !$0 { deleteTarget = nil } }
@@ -97,7 +108,7 @@ struct ContentView: View {
         ) {
             deleteDialogButtons
         } message: {
-            Text("skill 目录会被移入废纸篓，可随时恢复。")
+            Text(L("skill 目录会被移入废纸篓，可随时恢复。"))
         }
         .overlay(alignment: .bottom) {
             if let toast = store.toast {
@@ -109,12 +120,19 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.2), value: store.toast)
     }
 
+    private var welcomeBinding: Binding<Bool> {
+        Binding(
+            get: { !hasSeenWelcome },
+            set: { hasSeenWelcome = !$0 }
+        )
+    }
+
     // MARK: - Columns
 
     private var sidebar: some View {
         List(selection: $filter) {
-            Section("来源") {
-                Label("全部", systemImage: "square.grid.2x2")
+            Section(L("来源")) {
+                Label(L("全部"), systemImage: "square.grid.2x2")
                     .badge(store.skills.count)
                     .tag(SidebarFilter.all)
                 ForEach(Tool.allCases) { tool in
@@ -143,7 +161,7 @@ struct ContentView: View {
             }
         }
         .navigationTitle(filter.title)
-        .navigationSubtitle("\(filteredSkills.count) 个 skill")
+        .navigationSubtitle(L("\(filteredSkills.count) 个 skill"))
         .navigationSplitViewColumnWidth(min: 260, ideal: 320)
         .toolbar { listToolbar }
     }
@@ -156,9 +174,9 @@ struct ContentView: View {
             }
         } else {
             ContentUnavailableView(
-                "选择一个 skill",
+                L("选择一个 skill"),
                 systemImage: "sparkles.rectangle.stack",
-                description: Text("从左侧列表选择 skill 查看详情")
+                description: Text(L("从左侧列表选择 skill 查看详情"))
             )
         }
     }
@@ -166,19 +184,19 @@ struct ContentView: View {
     private var emptyState: some View {
         ContentUnavailableView {
             Label(
-                searchText.isEmpty ? "还没有 skill" : "没有匹配的 skill",
+                searchText.isEmpty ? L("还没有 skill") : L("没有匹配的 skill"),
                 systemImage: searchText.isEmpty ? "sparkles.rectangle.stack" : "magnifyingglass"
             )
         } description: {
             Text(
                 searchText.isEmpty
-                    ? "新建一个 skill，或把 skill 文件夹 / zip 拖到窗口中导入"
-                    : "换个关键词试试"
+                    ? L("新建一个 skill，或把 skill 文件夹 / zip 拖到窗口中导入")
+                    : L("换个关键词试试")
             )
         } actions: {
             if searchText.isEmpty {
-                Button("新建 Skill") { showNewSkillSheet = true }
-                Button("导入…") { showImporter = true }
+                Button(L("新建 Skill")) { showNewSkillSheet = true }
+                Button(L("导入…")) { showImporter = true }
             }
         }
     }
@@ -189,17 +207,17 @@ struct ContentView: View {
     private var listToolbar: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             Menu {
-                Button("新建空白 Skill…") { showNewSkillSheet = true }
-                Button("导入文件夹 / zip…") { showImporter = true }
-                Button("从 GitHub 安装…") { showGitHubSheet = true }
+                Button(L("新建空白 Skill…")) { showNewSkillSheet = true }
+                Button(L("导入文件夹 / zip…")) { showImporter = true }
+                Button(L("从 GitHub 安装…")) { showGitHubSheet = true }
             } label: {
-                Label("添加", systemImage: "plus")
+                Label(L("添加"), systemImage: "plus")
             }
         }
         ToolbarItem {
-            Picker("排序", selection: $sortOrder) {
+            Picker(L("排序"), selection: $sortOrder) {
                 ForEach(SortOrder.allCases) { order in
-                    Text(order.rawValue).tag(order)
+                    Text(order.title).tag(order)
                 }
             }
             .pickerStyle(.menu)
@@ -208,7 +226,7 @@ struct ContentView: View {
             Button {
                 Task { await store.refresh() }
             } label: {
-                Label("刷新", systemImage: "arrow.clockwise")
+                Label(L("刷新"), systemImage: "arrow.clockwise")
             }
             .disabled(store.isLoading)
         }
@@ -217,7 +235,7 @@ struct ContentView: View {
     @ViewBuilder
     private func rowContextMenu(for skill: Skill) -> some View {
         ForEach(skill.copies) { copy in
-            Button("在 Finder 中显示（\(copy.tool.displayName)）") {
+            Button(L("在 Finder 中显示（\(copy.tool.displayName)）")) {
                 NSWorkspace.shared.activateFileViewerSelecting([copy.directoryURL])
             }
         }
@@ -225,32 +243,32 @@ struct ContentView: View {
         ForEach(skill.copies) { copy in
             let others = Tool.allCases.filter { $0 != copy.tool && skill.copy(for: $0) == nil }
             ForEach(others) { target in
-                Button("复制到 \(target.displayName)") {
+                Button(L("复制到 \(target.displayName)")) {
                     Task { _ = await store.copySkill(copy, to: target, overwrite: false) }
                 }
             }
         }
         Divider()
-        Button("删除…", role: .destructive) { deleteTarget = skill }
+        Button(L("删除…"), role: .destructive) { deleteTarget = skill }
     }
 
     @ViewBuilder
     private var deleteDialogButtons: some View {
         if let skill = deleteTarget {
             ForEach(skill.copies) { copy in
-                Button("从 \(copy.tool.displayName) 删除", role: .destructive) {
+                Button(L("从 \(copy.tool.displayName) 删除"), role: .destructive) {
                     Task { await store.trash(copy) }
                 }
             }
             if skill.copies.count > 1 {
-                Button("从两者删除", role: .destructive) {
+                Button(L("从两者删除"), role: .destructive) {
                     let copies = skill.copies
                     Task {
                         for copy in copies { await store.trash(copy) }
                     }
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button(L("取消"), role: .cancel) {}
         }
     }
 
@@ -316,7 +334,7 @@ struct SkillRowView: View {
                 if skill.metadataMissing {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.yellow)
-                        .help("SKILL.md 缺失或元数据不完整")
+                        .help(L("SKILL.md 缺失或元数据不完整"))
                 }
                 Spacer()
                 ForEach(skill.tools) { tool in

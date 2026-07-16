@@ -16,12 +16,21 @@ struct SkillDetailView: View {
     @State private var overwriteCopyTarget: Tool?
 
     enum DetailMode: String, CaseIterable, Identifiable {
-        case preview = "预览"
-        case edit = "编辑"
-        case files = "文件"
-        case usage = "用法"
+        case preview
+        case edit
+        case files
+        case usage
 
         var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .preview: return L("预览")
+            case .edit: return L("编辑")
+            case .files: return L("文件")
+            case .usage: return L("用法")
+            }
+        }
     }
 
     private var currentCopy: SkillCopy {
@@ -42,28 +51,28 @@ struct SkillDetailView: View {
         .task(id: currentCopy.id) {
             loadEditorText()
         }
-        .alert("Frontmatter 校验未通过", isPresented: $showForceSaveAlert) {
-            Button("仍要保存", role: .destructive) {
+        .alert(L("Frontmatter 校验未通过"), isPresented: $showForceSaveAlert) {
+            Button(L("仍要保存"), role: .destructive) {
                 Task { await save(force: true) }
             }
-            Button("取消", role: .cancel) {}
+            Button(L("取消"), role: .cancel) {}
         } message: {
-            Text("文件开头缺少合法的 YAML frontmatter（--- 包裹的 name/description 块），可能导致工具无法识别此 skill。")
+            Text(L("文件开头缺少合法的 YAML frontmatter（--- 包裹的 name/description 块），可能导致工具无法识别此 skill。"))
         }
         .confirmationDialog(
-            "\(overwriteCopyTarget?.displayName ?? "") 中已存在「\(skill.folderName)」",
+            L("\(overwriteCopyTarget?.displayName ?? "") 中已存在「\(skill.folderName)」"),
             isPresented: Binding(
                 get: { overwriteCopyTarget != nil },
                 set: { if !$0 { overwriteCopyTarget = nil } }
             ),
             titleVisibility: .visible
         ) {
-            Button("覆盖（旧版本移入废纸篓）", role: .destructive) {
+            Button(L("覆盖（旧版本移入废纸篓）"), role: .destructive) {
                 if let target = overwriteCopyTarget {
                     Task { _ = await store.copySkill(currentCopy, to: target, overwrite: true) }
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button(L("取消"), role: .cancel) {}
         }
     }
 
@@ -87,7 +96,9 @@ struct SkillDetailView: View {
                     .lineLimit(3)
             } else if !currentCopy.hasValidMetadata {
                 Label(
-                    currentCopy.hasSkillFile ? "SKILL.md 缺少合法的 frontmatter 元数据" : "缺少 SKILL.md 文件",
+                    currentCopy.hasSkillFile
+                        ? L("SKILL.md 缺少合法的 frontmatter 元数据")
+                        : L("缺少 SKILL.md 文件"),
                     systemImage: "exclamationmark.triangle.fill"
                 )
                 .font(.callout)
@@ -96,7 +107,7 @@ struct SkillDetailView: View {
 
             HStack(spacing: 12) {
                 if skill.copies.count > 1 {
-                    Picker("副本", selection: toolSelection) {
+                    Picker(L("副本"), selection: toolSelection) {
                         ForEach(skill.tools) { tool in
                             Text(tool.displayName).tag(tool)
                         }
@@ -127,17 +138,17 @@ struct SkillDetailView: View {
                 Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(currentCopy.directoryURL.path, forType: .string)
-                    store.showToast(Toast("路径已复制", style: .info))
+                    store.showToast(Toast(L("路径已复制"), style: .info))
                 } label: {
                     Image(systemName: "doc.on.doc")
                 }
                 .buttonStyle(.borderless)
-                .help("复制路径")
+                .help(L("复制路径"))
             }
 
-            Picker("模式", selection: $mode) {
+            Picker(L("模式"), selection: $mode) {
                 ForEach(DetailMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
+                    Text(mode.title).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
@@ -160,16 +171,16 @@ struct SkillDetailView: View {
             Button {
                 NSWorkspace.shared.activateFileViewerSelecting([currentCopy.directoryURL])
             } label: {
-                Label("在 Finder 中显示", systemImage: "folder")
+                Label(L("在 Finder 中显示"), systemImage: "folder")
             }
-            .help("在 Finder 中显示")
+            .help(L("在 Finder 中显示"))
 
             Button {
                 NSWorkspace.shared.open(currentCopy.skillFileURL)
             } label: {
-                Label("用默认编辑器打开", systemImage: "square.and.pencil")
+                Label(L("用默认编辑器打开"), systemImage: "square.and.pencil")
             }
-            .help("用默认编辑器打开 SKILL.md")
+            .help(L("用默认编辑器打开 SKILL.md"))
             .disabled(!currentCopy.hasSkillFile)
 
             if let target = copyTargetTool {
@@ -179,17 +190,17 @@ struct SkillDetailView: View {
                         if !done { overwriteCopyTarget = target }
                     }
                 } label: {
-                    Label("复制到 \(target.displayName)", systemImage: "arrow.right.doc.on.clipboard")
+                    Label(L("复制到 \(target.displayName)"), systemImage: "arrow.right.doc.on.clipboard")
                 }
-                .help("复制到 \(target.displayName)")
+                .help(L("复制到 \(target.displayName)"))
             }
 
             Button(role: .destructive) {
                 onDelete(skill)
             } label: {
-                Label("删除", systemImage: "trash")
+                Label(L("删除"), systemImage: "trash")
             }
-            .help("移入废纸篓")
+            .help(L("移入废纸篓"))
         }
     }
 
@@ -209,9 +220,9 @@ struct SkillDetailView: View {
                 SimpleMarkdownView(text: Self.stripFrontmatter(loadedText))
             } else {
                 ContentUnavailableView(
-                    "没有 SKILL.md",
+                    L("没有 SKILL.md"),
                     systemImage: "doc.questionmark",
-                    description: Text("此目录缺少 SKILL.md，切换到“编辑”可创建一个。")
+                    description: Text(L("此目录缺少 SKILL.md，切换到“编辑”可创建一个。"))
                 )
             }
         case .edit:
@@ -232,14 +243,14 @@ struct SkillDetailView: View {
             Divider()
             HStack {
                 if hasUnsavedChanges {
-                    Text("未保存的修改")
+                    Text(L("未保存的修改"))
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
                 Spacer()
-                Button("还原") { editorText = loadedText }
+                Button(L("还原")) { editorText = loadedText }
                     .disabled(!hasUnsavedChanges)
-                Button("保存") {
+                Button(L("保存")) {
                     Task { await save(force: false) }
                 }
                 .keyboardShortcut("s", modifiers: .command)
@@ -253,8 +264,8 @@ struct SkillDetailView: View {
     private var usageView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                usageSection(title: "自动触发", icon: "wand.and.stars") {
-                    Text("工具会根据 SKILL.md frontmatter 中的 description 判断当前任务是否匹配，匹配时自动加载此 skill，无需手动调用。描述写得越具体、包含越多触发关键词，命中越准确。")
+                usageSection(title: L("自动触发"), icon: "wand.and.stars") {
+                    Text(L("工具会根据 SKILL.md frontmatter 中的 description 判断当前任务是否匹配，匹配时自动加载此 skill，无需手动调用。描述写得越具体、包含越多触发关键词，命中越准确。"))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -265,33 +276,36 @@ struct SkillDetailView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
                     } else {
-                        Label("此 skill 缺少 description，只能显式调用，建议在“编辑”中补全。", systemImage: "exclamationmark.triangle")
-                            .font(.callout)
-                            .foregroundStyle(.orange)
+                        Label(
+                            L("此 skill 缺少 description，只能显式调用，建议在“编辑”中补全。"),
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .font(.callout)
+                        .foregroundStyle(.orange)
                     }
                 }
 
-                usageSection(title: "显式调用", icon: "keyboard") {
+                usageSection(title: L("显式调用"), icon: "keyboard") {
                     if skill.copy(for: .claudeCode) != nil {
                         copyRow(
                             snippet: "/\(skill.folderName)",
-                            note: "Claude Code 中作为斜杠命令直接调用"
+                            note: L("Claude Code 中作为斜杠命令直接调用")
                         )
                     }
                     copyRow(
-                        snippet: "使用 \(currentCopy.displayName) 技能：",
-                        note: "对话中自然语言指名调用（Claude Code / Codex 通用）"
+                        snippet: L("使用 \(currentCopy.displayName) 技能："),
+                        note: L("对话中自然语言指名调用（Claude Code / Codex 通用）")
                     )
                 }
 
-                usageSection(title: "示例提示词", icon: "text.bubble") {
+                usageSection(title: L("示例提示词"), icon: "text.bubble") {
                     copyRow(
                         snippet: examplePrompt,
-                        note: "复制后补全任务内容即可发送"
+                        note: L("复制后补全任务内容即可发送")
                     )
                 }
 
-                usageSection(title: "安装位置", icon: "internaldrive") {
+                usageSection(title: L("安装位置"), icon: "internaldrive") {
                     ForEach(skill.copies) { copy in
                         HStack(spacing: 8) {
                             ToolBadge(tool: copy.tool)
@@ -333,12 +347,12 @@ struct SkillDetailView: View {
                 Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(snippet, forType: .string)
-                    store.showToast(Toast("已复制", style: .info))
+                    store.showToast(Toast(L("已复制"), style: .info))
                 } label: {
                     Image(systemName: "doc.on.doc")
                 }
                 .buttonStyle(.borderless)
-                .help("复制")
+                .help(L("复制"))
             }
             .padding(10)
             .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
@@ -354,9 +368,9 @@ struct SkillDetailView: View {
             let firstClause = description
                 .components(separatedBy: CharacterSet(charactersIn: "。.;；"))
                 .first ?? description
-            return "请使用 \(currentCopy.displayName) 技能：\(firstClause.trimmingCharacters(in: .whitespaces))"
+            return L("请使用 \(currentCopy.displayName) 技能：\(firstClause.trimmingCharacters(in: .whitespaces))")
         }
-        return "请使用 \(currentCopy.displayName) 技能完成以下任务："
+        return L("请使用 \(currentCopy.displayName) 技能完成以下任务：")
     }
 
     private var fileList: some View {

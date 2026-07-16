@@ -9,7 +9,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Skills 目录") {
+            Section(L("Skills 目录")) {
                 pathField(
                     tool: .claudeCode,
                     override: $claudePathOverride
@@ -18,12 +18,12 @@ struct SettingsView: View {
                     tool: .codex,
                     override: $codexPathOverride
                 )
-                Text("留空使用默认路径。修改后点击刷新或重新打开 App 生效。")
+                Text(L("留空使用默认路径。修改后点击刷新或重新打开 App 生效。"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Section {
-                Button("立即重新扫描") {
+                Button(L("立即重新扫描")) {
                     Task {
                         await store.refresh()
                         store.startWatching()
@@ -42,11 +42,11 @@ struct SettingsView: View {
             TextField(
                 tool.displayName,
                 text: override,
-                prompt: Text(tool.defaultSkillsDirectory.path)
+                prompt: Text(verbatim: tool.defaultSkillsDirectory.path)
             )
             .textFieldStyle(.roundedBorder)
             .font(.callout.monospaced())
-            Text("当前生效：\(tool.skillsDirectory.path)")
+            Text(L("当前生效：\(tool.skillsDirectory.path)"))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }

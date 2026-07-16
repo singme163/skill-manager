@@ -24,25 +24,33 @@ struct NewSkillSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("新建空白 Skill")
+            Text(L("新建空白 Skill"))
                 .font(.title3.weight(.semibold))
 
             Form {
-                TextField("名称", text: $name, prompt: Text("my-new-skill"))
+                TextField(L("名称"), text: $name, prompt: Text(verbatim: "my-new-skill"))
                     .textFieldStyle(.roundedBorder)
-                TextField("描述", text: $descriptionText, prompt: Text("这个 skill 做什么、什么时候用"), axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(2...4)
+                TextField(
+                    L("描述"),
+                    text: $descriptionText,
+                    prompt: Text(L("这个 skill 做什么、什么时候用")),
+                    axis: .vertical
+                )
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(2...4)
             }
 
             if !trimmedName.isEmpty && !nameIsValid {
-                Label("名称只能包含小写字母、数字和连字符，如 my-new-skill", systemImage: "exclamationmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                Label(
+                    L("名称只能包含小写字母、数字和连字符，如 my-new-skill"),
+                    systemImage: "exclamationmark.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(.red)
             }
             if !nameConflicts.isEmpty {
                 Label(
-                    "「\(trimmedName)」已存在于 \(nameConflicts.map(\.displayName).joined(separator: "、"))",
+                    L("「\(trimmedName)」已存在于 \(nameConflicts.map(\.displayName).joined(separator: "、"))"),
                     systemImage: "exclamationmark.circle"
                 )
                 .font(.caption)
@@ -53,9 +61,9 @@ struct NewSkillSheet: View {
 
             HStack {
                 Spacer()
-                Button("取消") { dismiss() }
+                Button(L("取消")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button("创建") {
+                Button(L("创建")) {
                     isWorking = true
                     Task {
                         let ok = await store.createTemplate(
@@ -91,13 +99,13 @@ struct GitHubInstallSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("从 GitHub 安装")
+            Text(L("从 GitHub 安装"))
                 .font(.title3.weight(.semibold))
-            Text("粘贴公开仓库或仓库子目录链接，例如\nhttps://github.com/org/repo 或 https://github.com/org/repo/tree/main/skills/foo")
+            Text(L("粘贴公开仓库或仓库子目录链接，例如\nhttps://github.com/org/repo 或 https://github.com/org/repo/tree/main/skills/foo"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            TextField("GitHub 链接", text: $urlText, prompt: Text("https://github.com/…"))
+            TextField(L("GitHub 链接"), text: $urlText, prompt: Text(verbatim: "https://github.com/…"))
                 .textFieldStyle(.roundedBorder)
                 .disabled(isDownloading)
 
@@ -111,14 +119,14 @@ struct GitHubInstallSheet: View {
                 if isDownloading {
                     ProgressView()
                         .controlSize(.small)
-                    Text("正在下载…")
+                    Text(L("正在下载…"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("取消") { dismiss() }
+                Button(L("取消")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button("下载并查找 Skill") {
+                Button(L("下载并查找 Skill")) {
                     download()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -164,8 +172,12 @@ struct InstallCandidatesSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(candidates.count > 1 ? "选择要安装的 Skill（找到 \(candidates.count) 个）" : "安装 Skill")
-                .font(.title3.weight(.semibold))
+            Text(
+                candidates.count > 1
+                    ? L("选择要安装的 Skill（找到 \(candidates.count) 个）")
+                    : L("安装 Skill")
+            )
+            .font(.title3.weight(.semibold))
 
             List(candidates, selection: $selectedCandidateIDs) { candidate in
                 VStack(alignment: .leading, spacing: 2) {
@@ -186,9 +198,9 @@ struct InstallCandidatesSheet: View {
 
             HStack {
                 Spacer()
-                Button("取消") { dismiss() }
+                Button(L("取消")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button("安装") {
+                Button(L("安装")) {
                     Task { await install(overwrite: false) }
                 }
                 .keyboardShortcut(.defaultAction)
@@ -202,18 +214,18 @@ struct InstallCandidatesSheet: View {
             selectedCandidateIDs = Set(candidates.map(\.id))
         }
         .confirmationDialog(
-            "存在同名 skill",
+            L("存在同名 skill"),
             isPresented: $showOverwriteConfirm,
             titleVisibility: .visible
         ) {
-            Button("覆盖（旧版本移入废纸篓）", role: .destructive) {
+            Button(L("覆盖（旧版本移入废纸篓）"), role: .destructive) {
                 let pending = conflicts
                 Task {
                     _ = await store.install(pending, overwrite: true)
                     dismiss()
                 }
             }
-            Button("跳过这些", role: .cancel) { dismiss() }
+            Button(L("跳过这些"), role: .cancel) { dismiss() }
         } message: {
             Text(conflicts.map { "\($0.candidate.name) → \($0.tool.displayName)" }.joined(separator: "\n"))
         }
@@ -244,7 +256,7 @@ struct ToolTargetPicker: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            Text("安装到")
+            Text(L("安装到"))
                 .foregroundStyle(.secondary)
             ForEach(Tool.allCases) { tool in
                 Toggle(tool.displayName, isOn: Binding(

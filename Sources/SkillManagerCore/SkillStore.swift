@@ -59,9 +59,9 @@ public final class SkillStore: ObservableObject {
     public func trash(_ copy: SkillCopy) async {
         do {
             try FileManager.default.trashItem(at: copy.directoryURL, resultingItemURL: nil)
-            showToast(Toast("已将「\(copy.folderName)」从 \(copy.tool.displayName) 移入废纸篓"))
+            showToast(Toast(L("已将「\(copy.folderName)」从 \(copy.tool.displayName) 移入废纸篓")))
         } catch {
-            showToast(Toast("删除失败：\(error.localizedDescription)", style: .error))
+            showToast(Toast(L("删除失败：\(error.localizedDescription)"), style: .error))
         }
         await refresh()
     }
@@ -95,11 +95,11 @@ public final class SkillStore: ObservableObject {
                     showToast(Toast(error.localizedDescription, style: .error))
                 }
             } catch {
-                showToast(Toast("安装失败：\(error.localizedDescription)", style: .error))
+                showToast(Toast(L("安装失败：\(error.localizedDescription)"), style: .error))
             }
         }
         if installed > 0 {
-            showToast(Toast("已安装 \(installed) 个 skill"))
+            showToast(Toast(L("已安装 \(installed) 个 skill")))
         }
         await refresh()
         return conflicts
@@ -117,7 +117,7 @@ public final class SkillStore: ObservableObject {
             }
         }
         if succeeded {
-            showToast(Toast("已创建「\(name)」"))
+            showToast(Toast(L("已创建「\(name)」")))
         }
         await refresh()
         return succeeded
@@ -126,7 +126,7 @@ public final class SkillStore: ObservableObject {
     public func copySkill(_ copy: SkillCopy, to tool: Tool, overwrite: Bool) async -> Bool {
         do {
             try SkillInstaller.copySkill(copy, to: tool, overwrite: overwrite)
-            showToast(Toast("已将「\(copy.folderName)」复制到 \(tool.displayName)"))
+            showToast(Toast(L("已将「\(copy.folderName)」复制到 \(tool.displayName)")))
             await refresh()
             return true
         } catch let error as InstallError {
@@ -135,7 +135,7 @@ public final class SkillStore: ObservableObject {
             }
             showToast(Toast(error.localizedDescription, style: .error))
         } catch {
-            showToast(Toast("复制失败：\(error.localizedDescription)", style: .error))
+            showToast(Toast(L("复制失败：\(error.localizedDescription)"), style: .error))
         }
         await refresh()
         return true
@@ -144,11 +144,11 @@ public final class SkillStore: ObservableObject {
     public func saveSkillFile(_ copy: SkillCopy, contents: String) async -> Bool {
         do {
             try contents.write(to: copy.skillFileURL, atomically: true, encoding: .utf8)
-            showToast(Toast("已保存 \(copy.folderName)/SKILL.md"))
+            showToast(Toast(L("已保存 \(copy.folderName)/SKILL.md")))
             await refresh()
             return true
         } catch {
-            showToast(Toast("保存失败：\(error.localizedDescription)", style: .error))
+            showToast(Toast(L("保存失败：\(error.localizedDescription)"), style: .error))
             return false
         }
     }

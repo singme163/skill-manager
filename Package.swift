@@ -8,6 +8,7 @@ let settings: [SwiftSetting] = [
 
 let package = Package(
     name: "SkillManager",
+    defaultLocalization: "zh-Hans",
     platforms: [.macOS(.v14)],
     targets: [
         .target(

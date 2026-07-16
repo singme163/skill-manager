@@ -20,4 +20,12 @@ hdiutil create \
     -ov -format UDZO \
     dist/SkillManager.dmg
 
+# Set NOTARY_PROFILE (a `notarytool store-credentials` keychain profile) to
+# notarize and staple the dmg. Requires CODESIGN_IDENTITY in make-app.sh too.
+if [[ -n "${NOTARY_PROFILE:-}" ]]; then
+    xcrun notarytool submit dist/SkillManager.dmg \
+        --keychain-profile "$NOTARY_PROFILE" --wait
+    xcrun stapler staple dist/SkillManager.dmg
+fi
+
 echo "Built dist/SkillManager.dmg"
