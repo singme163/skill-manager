@@ -1,8 +1,15 @@
 import Foundation
 
-/// A skill source this app manages: an AI tool's skills directory, or a
-/// read-only source like the Claude plugin cache. Data-driven so users can
-/// add any tool that follows the `<dir>/<skill>/SKILL.md` convention.
+/// Groups sources in the sidebar: AI tools vs. registered projects.
+public enum ToolCategory: String, Codable, Sendable {
+    case tool
+    case project
+}
+
+/// A skill source this app manages: an AI tool's skills directory, a
+/// registered project's `.claude/skills`, or a read-only source like the
+/// Claude plugin cache. Data-driven so users can add any source that
+/// follows the `<dir>/<skill>/SKILL.md` convention.
 public struct Tool: Identifiable, Hashable, Codable, Sendable {
     public let id: String
     public var name: String
@@ -20,6 +27,7 @@ public struct Tool: Identifiable, Hashable, Codable, Sendable {
     public var isBuiltIn: Bool
     /// Stable position: drives sidebar order and badge color assignment.
     public var sortOrder: Int
+    public var category: ToolCategory
 
     public init(
         id: String,
@@ -30,6 +38,7 @@ public struct Tool: Identifiable, Hashable, Codable, Sendable {
         isReadOnly: Bool = false,
         deepScan: Bool = false,
         isBuiltIn: Bool = false,
+        category: ToolCategory = .tool,
         sortOrder: Int = 0
     ) {
         self.id = id
@@ -40,7 +49,29 @@ public struct Tool: Identifiable, Hashable, Codable, Sendable {
         self.isReadOnly = isReadOnly
         self.deepScan = deepScan
         self.isBuiltIn = isBuiltIn
+        self.category = category
         self.sortOrder = sortOrder
+    }
+
+    // Custom decoding: `category` is new in v1.3, so registries persisted by
+    // v1.2 lack the key — default it to `.tool`.
+    private enum CodingKeys: String, CodingKey {
+        case id, name, badge, symbolName, directoryPath
+        case isReadOnly, deepScan, isBuiltIn, sortOrder, category
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        badge = try container.decode(String.self, forKey: .badge)
+        symbolName = try container.decode(String.self, forKey: .symbolName)
+        directoryPath = try container.decode(String.self, forKey: .directoryPath)
+        isReadOnly = try container.decode(Bool.self, forKey: .isReadOnly)
+        deepScan = try container.decode(Bool.self, forKey: .deepScan)
+        isBuiltIn = try container.decode(Bool.self, forKey: .isBuiltIn)
+        sortOrder = try container.decode(Int.self, forKey: .sortOrder)
+        category = try container.decodeIfPresent(ToolCategory.self, forKey: .category) ?? .tool
     }
 
     public var displayName: String { name }
@@ -144,6 +175,30 @@ public enum ToolRegistry {
             tools.append(.claudePlugins)
         }
         return tools
+    }
+
+    /// A directory qualifies as a registrable project when it carries a
+    /// `.claude/skills` folder.
+    public static func looksLikeProject(_ url: URL) -> Bool {
+        FileManager.default.fileExists(atPath: url.appending(path: ".claude/skills").path)
+    }
+
+    /// Registers a project directory: the managed source is its
+    /// `.claude/skills` subfolder.
+    public static func makeProject(projectDirectory: URL, existing: [Tool]) -> Tool {
+        let name = projectDirectory.lastPathComponent
+        let skillsPath = projectDirectory
+            .appending(path: ".claude/skills", directoryHint: .isDirectory)
+            .standardizedFileURL.path
+        return Tool(
+            id: "project-\(UUID().uuidString)",
+            name: name,
+            badge: String(name.prefix(12)),
+            symbolName: "folder",
+            directoryPath: (skillsPath as NSString).abbreviatingWithTildeInPath,
+            category: .project,
+            sortOrder: (existing.map(\.sortOrder).max() ?? 0) + 1
+        )
     }
 
     /// Creates a user-defined tool with a fresh id, appended after `existing`.

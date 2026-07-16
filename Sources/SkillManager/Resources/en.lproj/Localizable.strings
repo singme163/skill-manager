@@ -130,3 +130,10 @@
 "复制到…" = "Copy to…";
 "从全部工具删除" = "Delete from All Tools";
 "内置工具不可移除；修改路径后点击重新扫描生效。" = "Built-in tools can't be removed. After changing a path, rescan to apply.";
+
+/* Projects (v1.3) */
+"项目" = "Projects";
+"添加项目目录…" = "Add Project Folder…";
+"添加项目…" = "Add Project…";
+"登记项目后，管理其中的 .claude/skills 目录；也可以直接把项目文件夹拖进主窗口。" = "Registering a project manages its .claude/skills directory. You can also drop a project folder onto the main window.";
+"在该项目内的 Claude Code 会话中作为斜杠命令调用" = "Invoke as a slash command in Claude Code sessions inside this project";

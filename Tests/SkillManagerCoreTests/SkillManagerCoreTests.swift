@@ -120,6 +120,41 @@ import Foundation
         #expect(tools.contains { $0.id == "codex" && $0.directoryPath == "~/.codex/skills" })
     }
 
+    @Test func decodingV12RegistryDefaultsCategoryToTool() throws {
+        // Registry JSON persisted by v1.2 has no `category` key.
+        let v12JSON = """
+        [{"id":"claudeCode","name":"Claude Code","badge":"Claude",\
+        "symbolName":"asterisk.circle.fill","directoryPath":"~/.claude/skills",\
+        "isReadOnly":false,"deepScan":false,"isBuiltIn":true,"sortOrder":0}]
+        """
+        let tools = try JSONDecoder().decode([Tool].self, from: Data(v12JSON.utf8))
+        #expect(tools.first?.category == .tool)
+    }
+
+    @Test func makeProjectRegistersClaudeSkillsSubdirectory() throws {
+        let tempDir = try SkillInstaller.makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let projectDir = tempDir.appending(path: "my-app")
+        try FileManager.default.createDirectory(
+            at: projectDir.appending(path: ".claude/skills"), withIntermediateDirectories: true
+        )
+
+        #expect(ToolRegistry.looksLikeProject(projectDir))
+        #expect(!ToolRegistry.looksLikeProject(tempDir))
+
+        let project = ToolRegistry.makeProject(projectDirectory: projectDir, existing: [.claudeCode, .codex])
+        #expect(project.category == .project)
+        #expect(project.name == "my-app")
+        #expect(project.skillsDirectory.path.hasSuffix("my-app/.claude/skills"))
+        #expect(!project.isReadOnly)
+        #expect(project.sortOrder == 2)
+
+        // Round-trips through the registry with its category intact.
+        let data = try JSONEncoder().encode([project])
+        let decoded = try JSONDecoder().decode([Tool].self, from: data)
+        #expect(decoded.first?.category == .project)
+    }
+
     @Test func presetsAreDistinctAndPluginSourceIsReadOnly() {
         #expect(Set(Tool.presets.map(\.id)).count == Tool.presets.count)
         #expect(Tool.claudePlugins.isReadOnly)

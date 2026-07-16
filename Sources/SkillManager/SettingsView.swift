@@ -5,11 +5,12 @@ struct SettingsView: View {
     @EnvironmentObject private var store: SkillStore
 
     @State private var showCustomToolSheet = false
+    @State private var showProjectImporter = false
 
     var body: some View {
         Form {
             Section(L("工具")) {
-                ForEach(store.tools) { tool in
+                ForEach(store.regularTools) { tool in
                     toolRow(tool)
                 }
                 Menu(L("添加工具")) {
@@ -27,6 +28,15 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section(L("项目")) {
+                ForEach(store.projects) { project in
+                    toolRow(project)
+                }
+                Button(L("添加项目…")) { showProjectImporter = true }
+                Text(L("登记项目后，管理其中的 .claude/skills 目录；也可以直接把项目文件夹拖进主窗口。"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section {
                 Button(L("立即重新扫描")) {
                     Task {
@@ -41,6 +51,15 @@ struct SettingsView: View {
         .padding(.vertical, 8)
         .sheet(isPresented: $showCustomToolSheet) {
             CustomToolSheet()
+        }
+        .fileImporter(
+            isPresented: $showProjectImporter,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                Task { await store.addProject(directory: url) }
+            }
         }
     }
 

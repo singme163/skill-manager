@@ -315,10 +315,12 @@ struct SkillDetailView: View {
                 }
 
                 usageSection(title: L("显式调用"), icon: "keyboard") {
-                    if skill.copy(for: .claudeCode) != nil {
+                    if skill.copy(for: .claudeCode) != nil || currentCopy.tool.category == .project {
                         copyRow(
-                            snippet: "/\(skill.folderName)",
-                            note: L("Claude Code 中作为斜杠命令直接调用")
+                            snippet: "/\(currentCopy.directoryURL.lastPathComponent)",
+                            note: currentCopy.tool.category == .project
+                                ? L("在该项目内的 Claude Code 会话中作为斜杠命令调用")
+                                : L("Claude Code 中作为斜杠命令直接调用")
                         )
                     }
                     copyRow(

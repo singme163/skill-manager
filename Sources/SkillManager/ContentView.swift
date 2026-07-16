@@ -47,6 +47,7 @@ struct ContentView: View {
     @State private var showNewSkillSheet = false
     @State private var showGitHubSheet = false
     @State private var showImporter = false
+    @State private var showProjectImporter = false
     @State private var pendingInstall: PendingInstall?
     @State private var deleteTarget: Skill?
     @State private var importErrorMessage: String?
@@ -135,14 +136,32 @@ struct ContentView: View {
                 Label(L("全部"), systemImage: "square.grid.2x2")
                     .badge(store.skills.count)
                     .tag(SidebarFilter.all)
-                ForEach(store.tools) { tool in
+                ForEach(store.regularTools) { tool in
                     Label(tool.displayName, systemImage: tool.symbolName)
                         .badge(store.count(for: tool))
                         .tag(SidebarFilter.tool(tool))
                 }
             }
+            if !store.projects.isEmpty {
+                Section(L("项目")) {
+                    ForEach(store.projects) { project in
+                        Label(project.displayName, systemImage: project.symbolName)
+                            .badge(store.count(for: project))
+                            .tag(SidebarFilter.tool(project))
+                    }
+                }
+            }
         }
         .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+        .fileImporter(
+            isPresented: $showProjectImporter,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                Task { await store.addProject(directory: url) }
+            }
+        }
     }
 
     private var skillList: some View {
@@ -212,6 +231,8 @@ struct ContentView: View {
                 Button(L("新建空白 Skill…")) { showNewSkillSheet = true }
                 Button(L("导入文件夹 / zip…")) { showImporter = true }
                 Button(L("从 GitHub 安装…")) { showGitHubSheet = true }
+                Divider()
+                Button(L("添加项目目录…")) { showProjectImporter = true }
             } label: {
                 Label(L("添加"), systemImage: "plus")
             }
@@ -307,6 +328,12 @@ struct ContentView: View {
             var candidates: [InstallCandidate] = []
             var failures: [String] = []
             for url in urls {
+                // A dropped project folder registers as a project instead of
+                // importing its skills as copies.
+                if ToolRegistry.looksLikeProject(url) {
+                    await store.addProject(directory: url)
+                    continue
+                }
                 do {
                     candidates.append(contentsOf: try SkillInstaller.prepareImport(from: url))
                 } catch {

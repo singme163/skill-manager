@@ -33,6 +33,16 @@ public final class SkillStore: ObservableObject {
         tools.filter { !$0.isReadOnly }
     }
 
+    /// AI-tool sources for the sidebar's 来源 section.
+    public var regularTools: [Tool] {
+        tools.filter { $0.category == .tool }
+    }
+
+    /// Registered projects for the sidebar's 项目 section.
+    public var projects: [Tool] {
+        tools.filter { $0.category == .project }
+    }
+
     public func count(for tool: Tool) -> Int {
         skills.filter { $0.copy(for: tool) != nil }.count
     }
@@ -51,6 +61,23 @@ public final class SkillStore: ObservableObject {
         tools.append(added)
         persistToolsAndRescan()
         await refresh()
+    }
+
+    /// Registers a project directory (managing its `.claude/skills`).
+    /// Returns false when the same project is already registered.
+    @discardableResult
+    public func addProject(directory: URL) async -> Bool {
+        let skillsPath = directory
+            .appending(path: ".claude/skills", directoryHint: .isDirectory)
+            .standardizedFileURL.path
+        guard !tools.contains(where: { $0.skillsDirectory.standardizedFileURL.path == skillsPath }) else {
+            showToast(Toast(L("该项目已登记"), style: .info))
+            return false
+        }
+        let project = ToolRegistry.makeProject(projectDirectory: directory, existing: tools)
+        await addTool(project)
+        showToast(Toast(L("已登记项目「\(project.name)」")))
+        return true
     }
 
     public func removeTool(_ tool: Tool) async {
