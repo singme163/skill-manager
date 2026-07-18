@@ -24,7 +24,12 @@ struct SkillDetailView: View {
     @State private var showTranslation = false
     @State private var translatedDescription: String?
     @State private var isTranslating = false
-    @State private var translationRequest: String?
+    @State private var translationRequest: [String]?
+    @State private var showPreviewTranslation = false
+    @State private var translatedPreview: String?
+    @State private var isTranslatingPreview = false
+    @State private var previewRequest: [String]?
+    @State private var previewPlan: MarkdownTranslationPlan?
 
     enum DetailMode: String, CaseIterable, Identifiable {
         case preview
@@ -87,19 +92,42 @@ struct SkillDetailView: View {
             translatedDescription = nil
             isTranslating = false
             translationRequest = nil
+            resetPreviewTranslation()
+        }
+        .onChange(of: loadedText) {
+            resetPreviewTranslation()
         }
         .background {
             if #available(macOS 15.0, *) {
                 TranslationRunner(
                     request: $translationRequest,
                     targetIdentifier: Self.translationTargetIdentifier
-                ) { result in
-                    translatedDescription = result
-                    showTranslation = true
+                ) { results in
+                    if let first = results.first {
+                        translatedDescription = first
+                        showTranslation = true
+                    }
                     isTranslating = false
                 } onError: { message in
                     store.showToast(Toast(L("翻译失败：\(message)"), style: .error))
                     isTranslating = false
+                }
+                TranslationRunner(
+                    request: $previewRequest,
+                    targetIdentifier: Self.translationTargetIdentifier
+                ) { results in
+                    if let plan = previewPlan {
+                        var text = plan.reassembled(with: results)
+                        if plan.truncated {
+                            text += "\n\n> " + L("……（文档较长，仅翻译了开头部分）")
+                        }
+                        translatedPreview = text
+                        showPreviewTranslation = true
+                    }
+                    isTranslatingPreview = false
+                } onError: { message in
+                    store.showToast(Toast(L("翻译失败：\(message)"), style: .error))
+                    isTranslatingPreview = false
                 }
             }
         }
@@ -322,7 +350,28 @@ struct SkillDetailView: View {
         switch mode {
         case .preview:
             if currentCopy.hasSkillFile {
-                SimpleMarkdownView(text: Self.stripFrontmatter(loadedText))
+                SimpleMarkdownView(
+                    text: showPreviewTranslation ? (translatedPreview ?? previewSourceText) : previewSourceText
+                )
+                .overlay(alignment: .topTrailing) {
+                    if canOfferPreviewTranslation {
+                        Button {
+                            togglePreviewTranslation()
+                        } label: {
+                            if isTranslatingPreview {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "translate")
+                                    .foregroundStyle(showPreviewTranslation ? Color.accentColor : Color.secondary)
+                            }
+                        }
+                        .buttonStyle(.borderless)
+                        .padding(7)
+                        .background(.regularMaterial, in: Circle())
+                        .padding(10)
+                        .help(showPreviewTranslation ? L("显示原文") : L("翻译"))
+                    }
+                }
             } else {
                 ContentUnavailableView(
                     L("没有 SKILL.md"),
@@ -630,7 +679,51 @@ struct SkillDetailView: View {
             showTranslation = true
         } else if !isTranslating {
             isTranslating = true
-            translationRequest = description
+            translationRequest = [description]
+        }
+    }
+
+    // MARK: - Preview translation
+
+    private var previewSourceText: String {
+        Self.stripFrontmatter(loadedText)
+    }
+
+    private var canOfferPreviewTranslation: Bool {
+        guard #available(macOS 15.0, *) else { return false }
+        let sample = String(previewSourceText.prefix(1500))
+        guard sample.contains(where: { $0.isLetter }) else { return false }
+        let wantsChinese = Self.translationTargetIdentifier == "zh-Hans"
+        return wantsChinese
+            ? !TextLanguage.isDominantlyCJK(sample)
+            : TextLanguage.isDominantlyCJK(sample)
+    }
+
+    private func resetPreviewTranslation() {
+        showPreviewTranslation = false
+        translatedPreview = nil
+        isTranslatingPreview = false
+        previewRequest = nil
+        previewPlan = nil
+    }
+
+    private func togglePreviewTranslation() {
+        if showPreviewTranslation {
+            showPreviewTranslation = false
+        } else if translatedPreview != nil {
+            showPreviewTranslation = true
+        } else if !isTranslatingPreview {
+            let plan = MarkdownTranslationPlan.make(
+                markdown: previewSourceText,
+                targetIsChinese: Self.translationTargetIdentifier == "zh-Hans"
+            )
+            guard !plan.segments.isEmpty else {
+                store.showToast(Toast(L("没有需要翻译的内容"), style: .info))
+                return
+            }
+            previewPlan = plan
+            isTranslatingPreview = true
+            previewRequest = plan.segments
         }
     }
 

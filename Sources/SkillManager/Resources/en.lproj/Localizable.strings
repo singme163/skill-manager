@@ -213,3 +213,7 @@
 "翻译" = "Translate";
 "显示原文" = "Show Original";
 "翻译失败：%@" = "Translation failed: %@";
+
+/* Preview translation (v2.2) */
+"没有需要翻译的内容" = "Nothing to translate";
+"……（文档较长，仅翻译了开头部分）" = "… (long document — only the beginning was translated)";

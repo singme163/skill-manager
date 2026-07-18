@@ -485,6 +485,69 @@ import Foundation
     }
 }
 
+// MARK: - Markdown translation plan (v2.2)
+
+@Suite struct MarkdownTranslationPlanTests {
+    @Test func preservesStructureAndSkipsCodeAndChinese() {
+        let md = """
+        ## Overview
+
+        This skill does something useful.
+        这一行已经是中文，不需要翻译。
+
+        - First bullet item here
+        1. Ordered step one
+
+        ```bash
+        echo "code stays untouched"
+        ```
+
+        > A quoted line of English text
+        ---
+        """
+        let plan = MarkdownTranslationPlan.make(markdown: md, targetIsChinese: true)
+
+        // Only the English prose lines become segments.
+        #expect(plan.segments == [
+            "Overview",
+            "This skill does something useful.",
+            "First bullet item here",
+            "Ordered step one",
+            "A quoted line of English text",
+        ])
+        #expect(!plan.truncated)
+
+        // Reassembly restores markers, code, Chinese, and the rule verbatim.
+        let translated = plan.segments.map { "译:" + $0 }
+        let out = plan.reassembled(with: translated)
+        #expect(out.contains("## 译:Overview"))
+        #expect(out.contains("- 译:First bullet item here"))
+        #expect(out.contains("1. 译:Ordered step one"))
+        #expect(out.contains("> 译:A quoted line of English text"))
+        #expect(out.contains("echo \"code stays untouched\""))
+        #expect(out.contains("这一行已经是中文，不需要翻译。"))
+        #expect(out.contains("---"))
+        #expect(out.components(separatedBy: "\n").count == md.components(separatedBy: "\n").count)
+    }
+
+    @Test func respectsCharacterBudget() {
+        let lines = (0..<50).map { "Paragraph number \($0) with some english words." }
+        let md = lines.joined(separator: "\n\n")
+        let plan = MarkdownTranslationPlan.make(markdown: md, targetIsChinese: true, characterBudget: 200)
+        #expect(plan.truncated)
+        #expect(plan.segments.count < 10)
+        // Untranslated tail lines survive reassembly unchanged.
+        let out = plan.reassembled(with: plan.segments)
+        #expect(out.contains("Paragraph number 49"))
+    }
+
+    @Test func englishTargetTranslatesChineseOnly() {
+        let md = "全中文的一行说明文字\n\nAn English line stays as-is"
+        let plan = MarkdownTranslationPlan.make(markdown: md, targetIsChinese: false)
+        #expect(plan.segments == ["全中文的一行说明文字"])
+    }
+}
+
 // MARK: - Text language heuristic (v2.1)
 
 @Suite struct TextLanguageTests {
