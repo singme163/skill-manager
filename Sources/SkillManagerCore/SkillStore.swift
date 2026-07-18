@@ -237,6 +237,10 @@ public final class SkillStore: ObservableObject {
     /// Set by the menu bar extra to select a skill in the main window.
     @Published public var pendingSelection: Skill.ID?
 
+    /// Asks the detail view to switch tabs (raw DetailMode value); used by
+    /// the snapshot tooling and cleared once applied.
+    @Published public var requestedDetailMode: String?
+
     // MARK: - Sync (v2.0)
 
     public var syncRemote: String {

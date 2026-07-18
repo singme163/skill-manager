@@ -37,6 +37,7 @@ struct PendingInstall: Identifiable {
 
 struct ContentView: View {
     @EnvironmentObject private var store: SkillStore
+    @Environment(\.openSettings) private var openSettings
     @AppStorage("hasSeenWelcome") private var hasSeenWelcome = false
 
     @State private var filter: SidebarFilter = .all
@@ -98,6 +99,9 @@ struct ContentView: View {
         }
         .onOpenURL { url in
             handleDeepLink(url)
+        }
+        .task {
+            await runSnapshotScriptIfRequested()
         }
         .onChange(of: store.pendingSelection) {
             guard let id = store.pendingSelection else { return }
@@ -453,6 +457,83 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Snapshot mode (SM_SNAPSHOT_DIR)
+
+    /// Documentation screenshot generator: when SM_SNAPSHOT_DIR is set, walk
+    /// the app through its showcase states, render each window to a PNG
+    /// (self-rendering — no screen-recording permission involved), and quit.
+    private func runSnapshotScriptIfRequested() async {
+        guard let dir = ProcessInfo.processInfo.environment["SM_SNAPSHOT_DIR"] else { return }
+        let external = ProcessInfo.processInfo.environment["SM_SNAPSHOT_EXTERNAL"] == "1"
+        let output = URL(filePath: (dir as NSString).expandingTildeInPath, directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+
+        // External mode hands each state to a driver script that runs
+        // `screencapture -l <windowNumber>`: write the id into a .ready
+        // marker, wait for the matching .done, then move on.
+        func shoot(_ name: String, window: NSWindow?) async {
+            guard let window else { return }
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            try? await Task.sleep(for: .seconds(0.4))
+            if external {
+                let ready = output.appending(path: "\(name).ready")
+                let done = output.appending(path: "\(name).done")
+                try? String(window.windowNumber).write(to: ready, atomically: true, encoding: .utf8)
+                for _ in 0..<100 where !FileManager.default.fileExists(atPath: done.path) {
+                    try? await Task.sleep(for: .seconds(0.2))
+                }
+                try? FileManager.default.removeItem(at: ready)
+                try? FileManager.default.removeItem(at: done)
+            } else {
+                WindowSnapshotter.capture(window, to: output.appending(path: "\(name).png"))
+            }
+        }
+
+        hasSeenWelcome = true
+        try? await Task.sleep(for: .seconds(2))
+
+        // 1. Main window with a well-described skill selected.
+        if let skill = store.skills.first(where: { ($0.summary?.count ?? 0) > 40 }) ?? store.skills.first {
+            selectedSkillIDs = [skill.id]
+        }
+        try? await Task.sleep(for: .seconds(1))
+        await shoot("main", window: WindowSnapshotter.mainWindow)
+
+        // 2. Lint tab on a skill that actually has findings.
+        if let target = store.skills.first(where: { skill in
+            guard let copy = skill.copies.first else { return false }
+            return !SkillLinter.lint(copy: copy).isEmpty
+        }) {
+            selectedSkillIDs = [target.id]
+            try? await Task.sleep(for: .seconds(0.6))
+        }
+        store.requestedDetailMode = "lint"
+        try? await Task.sleep(for: .seconds(1))
+        await shoot("lint", window: WindowSnapshotter.mainWindow)
+        store.requestedDetailMode = "preview"
+        try? await Task.sleep(for: .seconds(0.4))
+
+        // 3. Discovery sheet (allow time for the remote index fetch).
+        showDiscovery = true
+        try? await Task.sleep(for: .seconds(4))
+        await shoot("discovery", window: WindowSnapshotter.mainWindow?.attachedSheet)
+        showDiscovery = false
+        try? await Task.sleep(for: .seconds(0.6))
+
+        // 4. Settings, tall enough to show the sync section.
+        openSettings()
+        try? await Task.sleep(for: .seconds(1.5))
+        let settingsWindow = NSApp.keyWindow ?? NSApp.windows.last(where: { $0.isVisible })
+        settingsWindow?.setContentSize(NSSize(width: 620, height: 1000))
+        settingsWindow?.center()
+        settingsWindow?.layoutIfNeeded()
+        try? await Task.sleep(for: .seconds(0.5))
+        await shoot("sync", window: settingsWindow)
+        try? await Task.sleep(for: .seconds(0.5))
+        NSApp.terminate(nil)
     }
 
     /// `skillmanager://install?url=<github-url>` — download and stage the

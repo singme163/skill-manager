@@ -62,6 +62,14 @@ struct SkillDetailView: View {
             Divider()
             content
         }
+        .onChange(of: store.requestedDetailMode) {
+            if let raw = store.requestedDetailMode,
+               let requested = DetailMode(rawValue: raw),
+               availableModes.contains(requested) {
+                mode = requested
+                store.requestedDetailMode = nil
+            }
+        }
         .task(id: currentCopy.id) {
             loadEditorText()
             syncFormFromEditor()

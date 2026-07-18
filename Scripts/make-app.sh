@@ -30,6 +30,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key><string>Skill Manager</string>
+    <key>CFBundleDevelopmentRegion</key><string>zh-Hans</string>
+    <key>CFBundleLocalizations</key>
+    <array><string>zh-Hans</string><string>en</string></array>
     <key>CFBundleDisplayName</key><string>Skill Manager</string>
     <key>CFBundleIdentifier</key><string>local.skillmanager</string>
     <key>CFBundleExecutable</key><string>SkillManager</string>
