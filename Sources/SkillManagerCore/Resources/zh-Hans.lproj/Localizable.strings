@@ -40,3 +40,14 @@
 "只有 SKILL.md 骨架，适合纯指令类 skill" = "只有 SKILL.md 骨架，适合纯指令类 skill";
 "附带 references/ 目录，适合需要背景资料的 skill" = "附带 references/ 目录，适合需要背景资料的 skill";
 "附带 scripts/ 可执行脚本，适合调用工具的 skill" = "附带 scripts/ 可执行脚本，适合调用工具的 skill";
+"尚未配置同步仓库，请先在设置中填写远端地址并初始化。" = "尚未配置同步仓库，请先在设置中填写远端地址并初始化。";
+"git 操作失败：%@" = "git 操作失败：%@";
+"同步仓库已就绪" = "同步仓库已就绪";
+"已推送 %lld 个 skill 到同步仓库" = "已推送 %lld 个 skill 到同步仓库";
+"已从同步仓库应用 %lld 个 skill" = "已从同步仓库应用 %lld 个 skill";
+"安装方式" = "安装方式";
+"用 Skill Manager 一键安装（需已安装 App）：" = "用 Skill Manager 一键安装（需已安装 App）：";
+"或从源仓库安装：" = "或从源仓库安装：";
+"手动安装：解压 %@ 到 ~/.claude/skills/ 或 ~/.codex/skills/" = "手动安装：解压 %@ 到 ~/.claude/skills/ 或 ~/.codex/skills/";
+"包含文件" = "包含文件";
+"由 [Skill Manager](%@) 导出" = "由 [Skill Manager](%@) 导出";

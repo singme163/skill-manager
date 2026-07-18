@@ -7,6 +7,10 @@ struct SettingsView: View {
     @State private var showCustomToolSheet = false
     @State private var showProjectImporter = false
     @State private var githubToken = GitHubAuth.token() ?? ""
+    @State private var syncRemote = UserDefaults.standard.string(forKey: SyncEngine.remoteDefaultsKey) ?? ""
+    @State private var isSyncing = false
+    @State private var showPullConfirm = false
+    @AppStorage("menuBarEnabled") private var menuBarEnabled = true
 
     var body: some View {
         Form {
@@ -64,6 +68,49 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            Section(L("多机同步")) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        TextField(
+                            L("同步仓库地址"),
+                            text: $syncRemote,
+                            prompt: Text(verbatim: "git@github.com:you/skills-sync.git")
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .font(.callout.monospaced())
+                        .disabled(isSyncing)
+                        Button(L("初始化")) {
+                            runSync { _ = await store.syncConfigure(remote: syncRemote) }
+                        }
+                        .disabled(isSyncing || syncRemote.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    HStack(spacing: 8) {
+                        Button(L("推送到远端")) {
+                            runSync { await store.syncPush() }
+                        }
+                        .disabled(isSyncing || !SyncEngine.isConfigured())
+                        Button(L("从远端拉取并应用…")) {
+                            showPullConfirm = true
+                        }
+                        .disabled(isSyncing || !SyncEngine.isConfigured())
+                        if isSyncing {
+                            ProgressView().controlSize(.small)
+                        }
+                        Spacer()
+                        if let last = store.lastSyncDate {
+                            Text(L("上次同步：\(last.formatted(date: .abbreviated, time: .shortened))"))
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    Text(L("用你自己的 git 仓库在多台机器间同步全局工具的 skill（不含项目与只读来源）。推送会把本机 skill 镜像到仓库；拉取会用仓库内容覆盖本机同名 skill（旧版本进废纸篓）。"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Section(L("菜单栏")) {
+                Toggle(L("在菜单栏常驻（快速搜索与最近 skill）"), isOn: $menuBarEnabled)
+            }
             Section {
                 Button(L("立即重新扫描")) {
                     Task {
@@ -79,6 +126,18 @@ struct SettingsView: View {
         .sheet(isPresented: $showCustomToolSheet) {
             CustomToolSheet()
         }
+        .confirmationDialog(
+            L("从远端拉取并应用？"),
+            isPresented: $showPullConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(L("拉取并覆盖本机同名 skill"), role: .destructive) {
+                runSync { await store.syncPullAndApply() }
+            }
+            Button(L("取消"), role: .cancel) {}
+        } message: {
+            Text(L("仓库里的 skill 会覆盖本机同名 skill，被覆盖的旧版本移入废纸篓。"))
+        }
         .fileImporter(
             isPresented: $showProjectImporter,
             allowedContentTypes: [.folder],
@@ -87,6 +146,14 @@ struct SettingsView: View {
             if case .success(let urls) = result, let url = urls.first {
                 Task { await store.addProject(directory: url) }
             }
+        }
+    }
+
+    private func runSync(_ operation: @escaping () async -> Void) {
+        isSyncing = true
+        Task {
+            await operation()
+            isSyncing = false
         }
     }
 

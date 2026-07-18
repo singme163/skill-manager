@@ -403,6 +403,88 @@ import Foundation
     }
 }
 
+// MARK: - Share, sync & deep links (v2.0)
+
+@Suite final class ShareAndSyncTests {
+    let tempDir: URL
+
+    init() throws {
+        tempDir = try SkillInstaller.makeTempDirectory()
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: tempDir)
+    }
+
+    @Test func parsesInstallDeepLinks() {
+        let valid = URL(string: "skillmanager://install?url=https://github.com/org/repo/tree/main/skills/foo")!
+        #expect(SkillInstaller.parseInstallDeepLink(valid) == "https://github.com/org/repo/tree/main/skills/foo")
+
+        #expect(SkillInstaller.parseInstallDeepLink(URL(string: "skillmanager://install?url=https://gitlab.com/x/y")!) == nil)
+        #expect(SkillInstaller.parseInstallDeepLink(URL(string: "skillmanager://other?url=https://github.com/o/r")!) == nil)
+        #expect(SkillInstaller.parseInstallDeepLink(URL(string: "https://github.com/o/r")!) == nil)
+        #expect(SkillInstaller.parseInstallDeepLink(URL(string: "skillmanager://install")!) == nil)
+    }
+
+    @Test func shareNoteIncludesInstallInstructions() throws {
+        try makeSkill("shareable", in: tempDir)
+        let dir = tempDir.appending(path: "shareable")
+        let origin = SkillOrigin(sourceURL: "https://github.com/org/repo", commit: "abc1234")
+        try origin.write(to: dir)
+
+        let copy = SkillScanner.scan(directory: tempDir, tool: .claudeCode)[0]
+        let note = ShareExporter.shareNote(for: copy)
+        #expect(note.contains("skillmanager://install?url=https://github.com/org/repo"))
+        #expect(note.contains("shareable.zip"))
+        #expect(note.contains("desc of shareable"))
+
+        let outDir = tempDir.appending(path: "out")
+        try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
+        let result = try ShareExporter.export(copy: copy, to: outDir)
+        #expect(FileManager.default.fileExists(atPath: result.zip.path))
+        #expect(FileManager.default.fileExists(atPath: result.note.path))
+    }
+
+    @Test func syncRoundTripThroughBareRepo() throws {
+        // Local "remote": a bare repository.
+        let remote = tempDir.appending(path: "remote.git")
+        try FileManager.default.createDirectory(at: remote, withIntermediateDirectories: true)
+        try SyncEngine.git(["init", "--bare", remote.path], in: nil)
+
+        // Machine A: a tool with two skills, pushed to the remote.
+        let toolDirA = tempDir.appending(path: "machine-a-skills")
+        try makeSkill("alpha", in: toolDirA)
+        try makeSkill("beta", in: toolDirA)
+        let toolA = Tool(
+            id: "claudeCode", name: "Claude Code", badge: "Claude",
+            symbolName: "x", directoryPath: toolDirA.path
+        )
+        let repoA = tempDir.appending(path: "repo-a")
+        try SyncEngine.configure(remote: remote.path, repoDir: repoA)
+        let summary = try SyncEngine.push(tools: [toolA], repoDir: repoA)
+        #expect(summary.mirroredSkills == 2)
+
+        // Machine B: fresh clone sees both skills as candidates.
+        let repoB = tempDir.appending(path: "repo-b")
+        try SyncEngine.configure(remote: remote.path, repoDir: repoB)
+        let entries = try SyncEngine.pullCandidates(repoDir: repoB)
+        #expect(entries.count == 2)
+        #expect(Set(entries.map(\.toolID)) == ["claudeCode"])
+        #expect(Set(entries.map(\.candidate.name)) == ["alpha", "beta"])
+
+        // A second push with no changes still succeeds (idempotent).
+        let again = try SyncEngine.push(tools: [toolA], repoDir: repoA)
+        #expect(again.pushed)
+    }
+
+    @Test func pushWithoutConfigurationThrows() {
+        let repoDir = tempDir.appending(path: "not-a-repo")
+        #expect(throws: SyncError.self) {
+            try SyncEngine.push(tools: [], repoDir: repoDir)
+        }
+    }
+}
+
 // MARK: - Localization
 
 @Suite struct LocalizationTests {

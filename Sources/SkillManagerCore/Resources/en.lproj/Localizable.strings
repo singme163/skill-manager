@@ -50,3 +50,16 @@
 "只有 SKILL.md 骨架，适合纯指令类 skill" = "Just a SKILL.md skeleton — for instruction-only skills";
 "附带 references/ 目录，适合需要背景资料的 skill" = "Includes a references/ folder — for skills that need background material";
 "附带 scripts/ 可执行脚本，适合调用工具的 skill" = "Includes an executable script under scripts/ — for tool-invoking skills";
+
+/* Sync & share (v2.0) */
+"尚未配置同步仓库，请先在设置中填写远端地址并初始化。" = "Sync repository not configured — set the remote URL in Settings and initialize first.";
+"git 操作失败：%@" = "git operation failed: %@";
+"同步仓库已就绪" = "Sync repository is ready";
+"已推送 %lld 个 skill 到同步仓库" = "Pushed %lld skill(s) to the sync repository";
+"已从同步仓库应用 %lld 个 skill" = "Applied %lld skill(s) from the sync repository";
+"安装方式" = "How to Install";
+"用 Skill Manager 一键安装（需已安装 App）：" = "One-click install with Skill Manager (app required):";
+"或从源仓库安装：" = "Or install from the source repository:";
+"手动安装：解压 %@ 到 ~/.claude/skills/ 或 ~/.codex/skills/" = "Manual install: unzip %@ into ~/.claude/skills/ or ~/.codex/skills/";
+"包含文件" = "Included Files";
+"由 [Skill Manager](%@) 导出" = "Exported by [Skill Manager](%@)";

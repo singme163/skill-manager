@@ -15,8 +15,10 @@ struct SkillManagerApp: App {
         }
     }
 
+    @AppStorage("menuBarEnabled") private var menuBarEnabled = true
+
     var body: some Scene {
-        WindowGroup("Skill Manager") {
+        WindowGroup("Skill Manager", id: "main") {
             ContentView()
                 .environmentObject(store)
                 .frame(minWidth: 880, minHeight: 540)
@@ -38,6 +40,14 @@ struct SkillManagerApp: App {
                 }
             }
         }
+
+        MenuBarExtra(isInserted: $menuBarEnabled) {
+            MenuBarView()
+                .environmentObject(store)
+        } label: {
+            Image(systemName: "puzzlepiece.extension")
+        }
+        .menuBarExtraStyle(.window)
 
         Settings {
             SettingsView()

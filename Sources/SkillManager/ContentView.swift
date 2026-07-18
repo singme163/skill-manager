@@ -96,6 +96,16 @@ struct ContentView: View {
             stageImport(of: urls)
             return true
         }
+        .onOpenURL { url in
+            handleDeepLink(url)
+        }
+        .onChange(of: store.pendingSelection) {
+            guard let id = store.pendingSelection else { return }
+            filter = .all
+            searchText = ""
+            selectedSkillIDs = [id]
+            store.pendingSelection = nil
+        }
         .alert(
             L("导入失败"),
             isPresented: Binding(
@@ -441,6 +451,23 @@ struct ContentView: View {
                 } else {
                     store.showToast(Toast(L("已导出 \(done) 个 zip")))
                 }
+            }
+        }
+    }
+
+    /// `skillmanager://install?url=<github-url>` — download and stage the
+    /// skills for the normal candidate/target confirmation flow.
+    private func handleDeepLink(_ url: URL) {
+        guard let target = SkillInstaller.parseInstallDeepLink(url) else {
+            store.showToast(Toast(L("无法识别的安装链接"), style: .error))
+            return
+        }
+        Task {
+            do {
+                let candidates = try await SkillInstaller.downloadFromGitHub(target)
+                pendingInstall = PendingInstall(candidates: candidates)
+            } catch {
+                store.showToast(Toast(error.localizedDescription, style: .error))
             }
         }
     }

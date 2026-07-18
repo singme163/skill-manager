@@ -186,3 +186,25 @@
 "载入编辑器" = "Load into Editor";
 "已载入快照，保存后生效" = "Snapshot loaded — save to apply";
 "模板" = "Template";
+
+/* Share, sync & menu bar (v2.0) */
+"分享（zip + 说明）" = "Share (zip + note)";
+"导出 zip 和分享说明到指定文件夹" = "Export a zip and a share note to a chosen folder";
+"已导出分享包" = "Share package exported";
+"无法识别的安装链接" = "Unrecognized install link";
+"多机同步" = "Multi-Device Sync";
+"同步仓库地址" = "Sync Repository URL";
+"初始化" = "Initialize";
+"推送到远端" = "Push to Remote";
+"从远端拉取并应用…" = "Pull & Apply from Remote…";
+"上次同步：%@" = "Last sync: %@";
+"用你自己的 git 仓库在多台机器间同步全局工具的 skill（不含项目与只读来源）。推送会把本机 skill 镜像到仓库；拉取会用仓库内容覆盖本机同名 skill（旧版本进废纸篓）。" = "Sync global tools' skills across machines through your own git repository (projects and read-only sources excluded). Pushing mirrors local skills into the repo; pulling overwrites same-named local skills (old versions go to the Trash).";
+"从远端拉取并应用？" = "Pull & apply from remote?";
+"拉取并覆盖本机同名 skill" = "Pull and overwrite same-named local skills";
+"仓库里的 skill 会覆盖本机同名 skill，被覆盖的旧版本移入废纸篓。" = "Skills in the repository will overwrite same-named local skills; replaced versions move to the Trash.";
+"菜单栏" = "Menu Bar";
+"在菜单栏常驻（快速搜索与最近 skill）" = "Stay in the menu bar (quick search and recent skills)";
+"搜索 skill" = "Search skills";
+"最近更新" = "Recently Updated";
+"打开 Skill Manager" = "Open Skill Manager";
+"退出" = "Quit";

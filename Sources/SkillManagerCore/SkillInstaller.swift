@@ -281,6 +281,19 @@ public enum SkillInstaller {
         }
     }
 
+    /// Parses `skillmanager://install?url=<github-url>` deep links, returning
+    /// the embedded GitHub URL when it is installable.
+    public static func parseInstallDeepLink(_ url: URL) -> String? {
+        guard url.scheme == "skillmanager",
+              url.host()?.lowercased() == "install",
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let target = components.queryItems?.first(where: { $0.name == "url" })?.value,
+              parseGitHubURL(target) != nil else {
+            return nil
+        }
+        return target
+    }
+
     /// Extracts the trailing commit sha from a zipball wrapper folder name
     /// ("owner-repo-abc1234"). Returns nil when the suffix isn't hex-like.
     static func shaSuffix(of wrapperFolderName: String) -> String? {

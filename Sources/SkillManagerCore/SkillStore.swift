@@ -234,6 +234,76 @@ public final class SkillStore: ObservableObject {
         }
     }
 
+    /// Set by the menu bar extra to select a skill in the main window.
+    @Published public var pendingSelection: Skill.ID?
+
+    // MARK: - Sync (v2.0)
+
+    public var syncRemote: String {
+        UserDefaults.standard.string(forKey: SyncEngine.remoteDefaultsKey) ?? ""
+    }
+
+    public var lastSyncDate: Date? {
+        UserDefaults.standard.object(forKey: SyncEngine.lastSyncDefaultsKey) as? Date
+    }
+
+    public func syncConfigure(remote: String) async -> Bool {
+        let trimmed = remote.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                try SyncEngine.configure(remote: trimmed)
+            }.value
+            UserDefaults.standard.set(trimmed, forKey: SyncEngine.remoteDefaultsKey)
+            showToast(Toast(L("同步仓库已就绪")))
+            return true
+        } catch {
+            showToast(Toast(error.localizedDescription, style: .error))
+            return false
+        }
+    }
+
+    /// Mirrors global (non-project, writable) tools into the sync repo and pushes.
+    public func syncPush() async {
+        let tools = regularTools.filter { !$0.isReadOnly }
+        do {
+            let summary = try await Task.detached(priority: .userInitiated) {
+                try SyncEngine.push(tools: tools)
+            }.value
+            UserDefaults.standard.set(Date.now, forKey: SyncEngine.lastSyncDefaultsKey)
+            showToast(Toast(L("已推送 \(summary.mirroredSkills) 个 skill 到同步仓库")))
+        } catch {
+            showToast(Toast(error.localizedDescription, style: .error))
+        }
+    }
+
+    /// Pulls the sync repo and applies its skills to matching local tools
+    /// (overwrite; old versions go to the Trash).
+    public func syncPullAndApply() async {
+        do {
+            let entries = try await Task.detached(priority: .userInitiated) {
+                try SyncEngine.pullCandidates()
+            }.value
+            var applied = 0
+            for (toolID, candidate) in entries {
+                guard let tool = tools.first(where: { $0.id == toolID }), !tool.isReadOnly else {
+                    continue
+                }
+                do {
+                    try SkillInstaller.install(candidate: candidate, to: tool, overwrite: true)
+                    applied += 1
+                } catch {
+                    showToast(Toast(error.localizedDescription, style: .error))
+                }
+            }
+            UserDefaults.standard.set(Date.now, forKey: SyncEngine.lastSyncDefaultsKey)
+            showToast(Toast(L("已从同步仓库应用 \(applied) 个 skill")))
+            await refresh()
+        } catch {
+            showToast(Toast(error.localizedDescription, style: .error))
+        }
+    }
+
     // MARK: - Origin updates
 
     public enum UpdateCheckResult: Equatable, Sendable {

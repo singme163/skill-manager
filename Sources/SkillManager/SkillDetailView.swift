@@ -20,6 +20,7 @@ struct SkillDetailView: View {
     @State private var fmName = ""
     @State private var fmDescription = ""
     @State private var showHistorySheet = false
+    @State private var showSharePicker = false
 
     enum DetailMode: String, CaseIterable, Identifiable {
         case preview
@@ -200,6 +201,22 @@ struct SkillDetailView: View {
                 Label(L("在 Finder 中显示"), systemImage: "folder")
             }
             .help(L("在 Finder 中显示"))
+
+            Button {
+                showSharePicker = true
+            } label: {
+                Label(L("分享（zip + 说明）"), systemImage: "square.and.arrow.up")
+            }
+            .help(L("导出 zip 和分享说明到指定文件夹"))
+            .fileImporter(
+                isPresented: $showSharePicker,
+                allowedContentTypes: [.folder],
+                allowsMultipleSelection: false
+            ) { result in
+                if case .success(let urls) = result, let folder = urls.first {
+                    shareExport(to: folder)
+                }
+            }
 
             Button {
                 NSWorkspace.shared.open(currentCopy.skillFileURL)
@@ -534,6 +551,24 @@ struct SkillDetailView: View {
                 Text(L("更新会覆盖本地修改（旧版本移入废纸篓）"))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func shareExport(to folder: URL) {
+        let copy = currentCopy
+        Task.detached {
+            do {
+                let result = try ShareExporter.export(copy: copy, to: folder)
+                await MainActor.run {
+                    store.showToast(Toast(L("已导出分享包")))
+                    NSWorkspace.shared.activateFileViewerSelecting([result.zip, result.note])
+                }
+            } catch {
+                let message = error.localizedDescription
+                await MainActor.run {
+                    store.showToast(Toast(L("导出失败：\(message)"), style: .error))
+                }
             }
         }
     }
