@@ -485,6 +485,18 @@ import Foundation
     }
 }
 
+// MARK: - Text language heuristic (v2.1)
+
+@Suite struct TextLanguageTests {
+    @Test func detectsDominantScript() {
+        #expect(TextLanguage.isDominantlyCJK("统一管理本机全部 skill 的工具"))
+        #expect(TextLanguage.isDominantlyCJK("修图 skill：保留主体与细节"))
+        #expect(!TextLanguage.isDominantlyCJK("Formats commit messages. Use when the user asks for a summary."))
+        #expect(!TextLanguage.isDominantlyCJK("Repair photos (支持 RAW) while preserving identity and texture across the whole pipeline"))
+        #expect(!TextLanguage.isDominantlyCJK(""))
+    }
+}
+
 // MARK: - Localization
 
 @Suite struct LocalizationTests {

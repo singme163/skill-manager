@@ -208,3 +208,8 @@
 "最近更新" = "Recently Updated";
 "打开 Skill Manager" = "Open Skill Manager";
 "退出" = "Quit";
+
+/* Description translation (v2.1) */
+"翻译" = "Translate";
+"显示原文" = "Show Original";
+"翻译失败：%@" = "Translation failed: %@";

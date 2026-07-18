@@ -21,6 +21,10 @@ struct SkillDetailView: View {
     @State private var fmDescription = ""
     @State private var showHistorySheet = false
     @State private var showSharePicker = false
+    @State private var showTranslation = false
+    @State private var translatedDescription: String?
+    @State private var isTranslating = false
+    @State private var translationRequest: String?
 
     enum DetailMode: String, CaseIterable, Identifiable {
         case preview
@@ -79,6 +83,25 @@ struct SkillDetailView: View {
             updateStatus = nil
             isCheckingUpdate = false
             isUpdating = false
+            showTranslation = false
+            translatedDescription = nil
+            isTranslating = false
+            translationRequest = nil
+        }
+        .background {
+            if #available(macOS 15.0, *) {
+                TranslationRunner(
+                    request: $translationRequest,
+                    targetIdentifier: Self.translationTargetIdentifier
+                ) { result in
+                    translatedDescription = result
+                    showTranslation = true
+                    isTranslating = false
+                } onError: { message in
+                    store.showToast(Toast(L("翻译失败：\(message)"), style: .error))
+                    isTranslating = false
+                }
+            }
         }
         .alert(L("Frontmatter 校验未通过"), isPresented: $showForceSaveAlert) {
             Button(L("仍要保存"), role: .destructive) {
@@ -125,10 +148,26 @@ struct SkillDetailView: View {
             }
 
             if let description = currentCopy.metadataDescription {
-                Text(description)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
+                HStack(alignment: .top, spacing: 6) {
+                    Text(displayedDescription(description))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(showTranslation ? 6 : 3)
+                    if canOfferTranslation(for: description) {
+                        Button {
+                            toggleTranslation(of: description)
+                        } label: {
+                            if isTranslating {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "translate")
+                                    .foregroundStyle(showTranslation ? Color.accentColor : Color.secondary)
+                            }
+                        }
+                        .buttonStyle(.borderless)
+                        .help(showTranslation ? L("显示原文") : L("翻译"))
+                    }
+                }
             } else if !currentCopy.hasValidMetadata {
                 Label(
                     currentCopy.hasSkillFile
@@ -431,7 +470,7 @@ struct SkillDetailView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     if let description = currentCopy.metadataDescription {
-                        Text(description)
+                        Text(displayedDescription(description))
                             .font(.callout)
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -560,6 +599,38 @@ struct SkillDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
+        }
+    }
+
+    // MARK: - Description translation
+
+    /// Target follows the app's UI language; source is auto-detected.
+    static var translationTargetIdentifier: String {
+        (Locale.preferredLanguages.first?.hasPrefix("zh") ?? false) ? "zh-Hans" : "en"
+    }
+
+    private func displayedDescription(_ original: String) -> String {
+        showTranslation ? (translatedDescription ?? original) : original
+    }
+
+    /// Offer translation only when the description isn't already in the
+    /// UI language (and the system framework is available).
+    private func canOfferTranslation(for description: String) -> Bool {
+        guard #available(macOS 15.0, *) else { return false }
+        let wantsChinese = Self.translationTargetIdentifier == "zh-Hans"
+        return wantsChinese
+            ? !TextLanguage.isDominantlyCJK(description)
+            : TextLanguage.isDominantlyCJK(description)
+    }
+
+    private func toggleTranslation(of description: String) {
+        if showTranslation {
+            showTranslation = false
+        } else if translatedDescription != nil {
+            showTranslation = true
+        } else if !isTranslating {
+            isTranslating = true
+            translationRequest = description
         }
     }
 
