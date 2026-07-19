@@ -16,7 +16,7 @@ sleep 1
 
 SM_SNAPSHOT_DIR="$DIR" SM_SNAPSHOT_EXTERNAL=1 ./dist/SkillManager.app/Contents/MacOS/SkillManager &
 
-for name in main lint discovery sync; do
+for name in main lint translate discovery sync; do
     n=0
     while [[ ! -f "$DIR/$name.ready" && $n -lt 100 ]]; do sleep 0.3; n=$((n+1)); done
     if [[ -f "$DIR/$name.ready" ]]; then

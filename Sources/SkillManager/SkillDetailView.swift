@@ -71,6 +71,14 @@ struct SkillDetailView: View {
             Divider()
             content
         }
+        .onChange(of: store.requestPreviewTranslation) {
+            if store.requestPreviewTranslation {
+                togglePreviewTranslation()
+                if !isTranslatingPreview {
+                    store.requestPreviewTranslation = false
+                }
+            }
+        }
         .onChange(of: store.requestedDetailMode) {
             if let raw = store.requestedDetailMode,
                let requested = DetailMode(rawValue: raw),
@@ -125,9 +133,11 @@ struct SkillDetailView: View {
                         showPreviewTranslation = true
                     }
                     isTranslatingPreview = false
+                    store.requestPreviewTranslation = false
                 } onError: { message in
                     store.showToast(Toast(L("翻译失败：\(message)"), style: .error))
                     isTranslatingPreview = false
+                    store.requestPreviewTranslation = false
                 }
             }
         }

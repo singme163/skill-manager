@@ -516,6 +516,22 @@ struct ContentView: View {
         store.requestedDetailMode = "preview"
         try? await Task.sleep(for: .seconds(0.4))
 
+        // 2.5 Preview translation on an English skill (waits for the
+        // on-device translation to finish, bounded).
+        if let english = store.skills.first(where: { skill in
+            guard let summary = skill.summary else { return false }
+            return summary.count > 40 && !TextLanguage.isDominantlyCJK(summary)
+        }) {
+            selectedSkillIDs = [english.id]
+            try? await Task.sleep(for: .seconds(0.8))
+            store.requestPreviewTranslation = true
+            for _ in 0..<80 where store.requestPreviewTranslation {
+                try? await Task.sleep(for: .seconds(0.5))
+            }
+            try? await Task.sleep(for: .seconds(1))
+            await shoot("translate", window: WindowSnapshotter.mainWindow)
+        }
+
         // 3. Discovery sheet (allow time for the remote index fetch).
         showDiscovery = true
         try? await Task.sleep(for: .seconds(4))

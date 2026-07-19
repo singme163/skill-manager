@@ -241,6 +241,10 @@ public final class SkillStore: ObservableObject {
     /// the snapshot tooling and cleared once applied.
     @Published public var requestedDetailMode: String?
 
+    /// Asks the detail view to run the preview translation; cleared when the
+    /// translation finishes (or can't run). Snapshot-tooling seam.
+    @Published public var requestPreviewTranslation = false
+
     // MARK: - Sync (v2.0)
 
     public var syncRemote: String {
