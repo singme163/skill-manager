@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var showCustomToolSheet = false
     @State private var showProjectImporter = false
     @State private var githubToken = GitHubAuth.token() ?? ""
+    @State private var anthropicKey = AnthropicAuth.key() ?? ""
     @State private var syncRemote = UserDefaults.standard.string(forKey: SyncEngine.remoteDefaultsKey) ?? ""
     @State private var isSyncing = false
     @State private var showPullConfirm = false
@@ -64,6 +65,32 @@ struct SettingsView: View {
                         }
                     }
                     Text(L("用于访问私有仓库与提高 API 限额，保存在系统钥匙串。"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Section(L("AI 助手")) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        SecureField(
+                            L("Anthropic API Key（可选）"),
+                            text: $anthropicKey,
+                            prompt: Text(verbatim: "sk-ant-…")
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        Button(L("保存")) {
+                            if AnthropicAuth.setKey(anthropicKey) {
+                                store.showToast(Toast(L("已保存到钥匙串"), style: .info))
+                            }
+                        }
+                        .disabled(anthropicKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                        Button(L("清除")) {
+                            AnthropicAuth.setKey(nil)
+                            anthropicKey = ""
+                            store.showToast(Toast(L("已从钥匙串移除"), style: .info))
+                        }
+                    }
+                    Text(L("配置后即可用 AI 生成/优化 description、修复检查问题。用你自己的 Anthropic 账号，Key 存系统钥匙串，请求直连 Anthropic 不经过任何服务端。"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

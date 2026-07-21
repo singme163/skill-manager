@@ -21,6 +21,7 @@ struct SkillDetailView: View {
     @State private var fmDescription = ""
     @State private var showHistorySheet = false
     @State private var showSharePicker = false
+    @State private var aiTask: AITask?
     @State private var showTranslation = false
     @State private var translatedDescription: String?
     @State private var isTranslating = false
@@ -30,6 +31,14 @@ struct SkillDetailView: View {
     @State private var isTranslatingPreview = false
     @State private var previewRequest: [String]?
     @State private var previewPlan: MarkdownTranslationPlan?
+
+    struct AITask: Identifiable {
+        let id = UUID()
+        let title: String
+        let original: String?
+        let generate: () async throws -> String
+        let apply: (String) async -> Void
+    }
 
     enum DetailMode: String, CaseIterable, Identifiable {
         case preview
@@ -164,6 +173,14 @@ struct SkillDetailView: View {
             }
             Button(L("取消"), role: .cancel) {}
         }
+        .sheet(item: $aiTask) { task in
+            AISuggestionSheet(
+                title: task.title,
+                original: task.original,
+                generate: task.generate,
+                apply: task.apply
+            )
+        }
     }
 
     // MARK: - Header
@@ -204,6 +221,15 @@ struct SkillDetailView: View {
                         }
                         .buttonStyle(.borderless)
                         .help(showTranslation ? L("显示原文") : L("翻译"))
+                    }
+                    if canOfferAI {
+                        Button {
+                            aiTask = descriptionTask(current: description)
+                        } label: {
+                            Image(systemName: "sparkles").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        .help(L("AI 优化描述"))
                     }
                 }
             } else if !currentCopy.hasValidMetadata {
@@ -497,6 +523,11 @@ struct SkillDetailView: View {
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.tertiary)
                         }
+                        Spacer()
+                        if canOfferAI, let task = aiFixTask(for: issue) {
+                            Button(L("AI 修复")) { aiTask = task }
+                                .controlSize(.small)
+                        }
                     }
                     .padding(.vertical, 2)
                 }
@@ -735,6 +766,81 @@ struct SkillDetailView: View {
             isTranslatingPreview = true
             previewRequest = plan.segments
         }
+    }
+
+    // MARK: - AI (Skill Doctor)
+
+    /// AI features need a key and a writable, real SKILL.md.
+    private var canOfferAI: Bool {
+        AnthropicAuth.hasKey && !currentCopy.tool.isReadOnly && currentCopy.hasSkillFile
+    }
+
+    private var skillBodyText: String { Self.stripFrontmatter(loadedText) }
+
+    private func descriptionTask(current: String?) -> AITask {
+        let copy = currentCopy
+        let name = copy.directoryURL.lastPathComponent
+        let body = skillBodyText
+        return AITask(
+            title: (current?.isEmpty == false) ? L("AI 优化描述") : L("AI 生成描述"),
+            original: current,
+            generate: { try await SkillDoctor.generateDescription(name: name, body: body) },
+            apply: { newValue in await applyDescription(newValue, to: copy) }
+        )
+    }
+
+    private func bodyTask() -> AITask {
+        let copy = currentCopy
+        let name = copy.directoryURL.lastPathComponent
+        let description = copy.metadataDescription ?? ""
+        return AITask(
+            title: L("AI 生成正文"),
+            original: nil,
+            generate: { try await SkillDoctor.generateBody(name: name, description: description) },
+            apply: { newBody in await applyBody(newBody, to: copy) }
+        )
+    }
+
+    /// Maps a fixable lint finding to an AI task; nil for non-AI rules.
+    private func aiFixTask(for issue: LintIssue) -> AITask? {
+        switch issue.ruleID {
+        case "description-missing", "description-short", "description-long", "trigger-hint":
+            return descriptionTask(current: currentCopy.metadataDescription)
+        case "body-empty":
+            return bodyTask()
+        default:
+            return nil
+        }
+    }
+
+    private func applyDescription(_ description: String, to copy: SkillCopy) async {
+        let updated = FrontmatterParser.settingKey("description", to: description, in: loadedText)
+        if await store.saveSkillFile(copy, contents: updated) {
+            loadedText = updated
+            editorText = updated
+            syncFormFromEditor()
+        }
+    }
+
+    private func applyBody(_ body: String, to copy: SkillCopy) async {
+        let updated = Self.replacingBody(in: loadedText, with: body)
+        if await store.saveSkillFile(copy, contents: updated) {
+            loadedText = updated
+            editorText = updated
+        }
+    }
+
+    /// Keeps the frontmatter block, replaces everything after it with `body`.
+    static func replacingBody(in markdown: String, with body: String) -> String {
+        let lines = markdown.components(separatedBy: "\n")
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else {
+            return body
+        }
+        for index in 1..<lines.count
+        where lines[index].trimmingCharacters(in: .whitespaces) == "---" {
+            return lines[0...index].joined(separator: "\n") + "\n\n" + body + "\n"
+        }
+        return body
     }
 
     private func shareExport(to folder: URL) {

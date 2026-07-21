@@ -63,3 +63,9 @@
 "手动安装：解压 %@ 到 ~/.claude/skills/ 或 ~/.codex/skills/" = "Manual install: unzip %@ into ~/.claude/skills/ or ~/.codex/skills/";
 "包含文件" = "Included Files";
 "由 [Skill Manager](%@) 导出" = "Exported by [Skill Manager](%@)";
+
+/* AI errors (v2.3) */
+"尚未配置 Anthropic API Key，请先在设置中填写。" = "No Anthropic API key configured — set one in Settings first.";
+"AI 没有返回内容，请重试。" = "The AI returned nothing — please try again.";
+"AI 请求失败（HTTP %lld）：%@" = "AI request failed (HTTP %1$lld): %2$@";
+"网络错误：%@" = "Network error: %@";

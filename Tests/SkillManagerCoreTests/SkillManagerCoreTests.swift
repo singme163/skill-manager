@@ -485,6 +485,50 @@ import Foundation
     }
 }
 
+// MARK: - Skill Doctor (v2.3)
+
+@Suite struct SkillDoctorTests {
+    @Test func descriptionPromptCarriesNameAndBody() {
+        let user = SkillDoctor.descriptionUserPrompt(name: "rescue-photo", body: "Repair and beautify photos.")
+        #expect(user.contains("rescue-photo"))
+        #expect(user.contains("Repair and beautify photos."))
+        #expect(SkillDoctor.descriptionSystemPrompt().contains("description"))
+    }
+
+    @Test func descriptionPromptCapsHugeBody() {
+        let huge = String(repeating: "x", count: 50_000)
+        let user = SkillDoctor.descriptionUserPrompt(name: "big", body: huge)
+        // Capped near maxBodyChars, not the full 50k.
+        #expect(user.count < 13_000)
+    }
+
+    @Test func cleanDescriptionStripsQuotesLabelsAndNewlines() {
+        #expect(SkillDoctor.cleanDescription("\"Formats commits.\"") == "Formats commits.")
+        #expect(SkillDoctor.cleanDescription("Description: Formats commits.") == "Formats commits.")
+        #expect(SkillDoctor.cleanDescription("描述：格式化提交信息。") == "格式化提交信息。")
+        #expect(SkillDoctor.cleanDescription("Line one\nline two") == "Line one line two")
+        #expect(SkillDoctor.cleanDescription("  \u{201C}Curly quoted\u{201D}  ") == "Curly quoted")
+    }
+
+    @Test func cleanBodyStripsWrappingCodeFence() {
+        let fenced = "```markdown\n# Title\n\nBody here.\n```"
+        #expect(SkillDoctor.cleanBody(fenced) == "# Title\n\nBody here.")
+        // A body with an inner code block is left intact.
+        let inner = "# Title\n\n```bash\necho hi\n```\n\nDone."
+        #expect(SkillDoctor.cleanBody(inner) == inner)
+    }
+
+    @Test func extractTextConcatenatesTextBlocks() {
+        let json = """
+        {"content":[{"type":"text","text":"Hello "},{"type":"text","text":"world"}],"stop_reason":"end_turn"}
+        """
+        #expect(SkillDoctor.extractText(Data(json.utf8)) == "Hello world")
+        // Error body yields the API message.
+        let err = #"{"error":{"type":"authentication_error","message":"invalid x-api-key"}}"#
+        #expect(SkillDoctor.apiErrorMessage(Data(err.utf8)) == "invalid x-api-key")
+    }
+}
+
 // MARK: - Markdown translation plan (v2.2)
 
 @Suite struct MarkdownTranslationPlanTests {

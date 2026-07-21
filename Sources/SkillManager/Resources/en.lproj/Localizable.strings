@@ -217,3 +217,18 @@
 /* Preview translation (v2.2) */
 "没有需要翻译的内容" = "Nothing to translate";
 "……（文档较长，仅翻译了开头部分）" = "… (long document — only the beginning was translated)";
+
+/* AI assistant (v2.3) */
+"AI 助手" = "AI Assistant";
+"Anthropic API Key（可选）" = "Anthropic API Key (Optional)";
+"配置后即可用 AI 生成/优化 description、修复检查问题。用你自己的 Anthropic 账号，Key 存系统钥匙串，请求直连 Anthropic 不经过任何服务端。" = "Once set, use AI to generate/improve descriptions and fix lint issues. Runs on your own Anthropic account — the key is stored in the system Keychain and requests go straight to Anthropic, through no server of ours.";
+"AI 优化描述" = "Improve description with AI";
+"AI 生成描述" = "Generate description with AI";
+"AI 生成正文" = "Generate body with AI";
+"AI 修复" = "AI Fix";
+"原内容" = "Current";
+"AI 建议" = "AI Suggestion";
+"AI 生成中…" = "Generating…";
+"生成失败" = "Generation Failed";
+"重新生成" = "Regenerate";
+"采用" = "Apply";
